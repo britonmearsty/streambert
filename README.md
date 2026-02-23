@@ -1,7 +1,7 @@
-[![Downloads@latest](https://img.shields.io/github/downloads/truelockmc/streanbert/latest/total?style=for-the-badge)](https://github.com/truelockmc/streanbert/releases/download/latest/)
-[![Release Version Badge](https://img.shields.io/github/v/release/truelockmc/streanbert?style=for-the-badge)](https://github.com/truelockmc/streanbert/releases)
-[![Issues Badge](https://img.shields.io/github/issues/truelockmc/streanbert?style=for-the-badge)](https://github.com/truelockmc/streanbert/issues)
-[![Closed Issues Badge](https://img.shields.io/github/issues-closed/truelockmc/streanbert?color=%238256d0&style=for-the-badge)](https://github.com/truelockmc/streanbert/issues?q=is%3Aissue+is%3Aclosed)<br>
+[![Downloads@latest](https://img.shields.io/github/downloads/truelockmc/streambert/latest/total?style=for-the-badge)](https://github.com/truelockmc/streambert/releases/download/latest/)
+[![Release Version Badge](https://img.shields.io/github/v/release/truelockmc/streambert?style=for-the-badge)](https://github.com/truelockmc/streambert/releases)
+[![Issues Badge](https://img.shields.io/github/issues/truelockmc/streambert?style=for-the-badge)](https://github.com/truelockmc/streambert/issues)
+[![Closed Issues Badge](https://img.shields.io/github/issues-closed/truelockmc/streambert?color=%238256d0&style=for-the-badge)](https://github.com/truelockmc/streambert/issues?q=is%3Aissue+is%3Aclosed)<br>
 
 # Streambert
 A cross-platform Electron Desktop App to stream and download any Movie, TV Series or Anime in the World. Zero Ads and Tracking <br></br>
