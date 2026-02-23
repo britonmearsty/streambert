@@ -2,7 +2,10 @@
 A cross-platform Electron Desktop App to stream and download any Movie or TV Series in the World. <br></br>
 ![Logo](public/logo.svg)
 
+![Explore new Stuff](screenshots/trending.png)
 ![Watch TV Series](screenshots/series.png)
+![Watch Movies](screenshots/movie.png)
+![Watch Anime](screenshots/anime.png)
 ![Download Everything](screenshots/download.png)
 ---
 ---
