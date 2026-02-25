@@ -7,6 +7,15 @@
 A cross-platform Electron Desktop App to stream and download any Movie, TV Series or Anime in the World. Zero Ads and Tracking <br></br>
 ![Logo](public/logo.svg)
 
+## Why Streambert?
+- 🎦 **Streaming:** Stream any Movie, Anime or TV Series from around the World.
+- 📥 **Downloading:** Download anything you want to watch (with Subtitles).
+- ⚙️ **Customizability:** Customize the Interface and Features to your unique needs.
+- 📚 **Library:** Track what you watched, save stuff you want to watch and manage your Downloads.
+- ✨ **Trending:** Discover new things to Watch every Day.
+- 🛡️ **Privacy:** Completely Ads and Tracker free, forever.
+- ⚡ **Speed:** Stream faster than any Browser can, download with multithreading.
+
 ![Explore new Stuff](screenshots/trending.png)
 ![Watch TV Series](screenshots/series.png)
 ![Watch Movies](screenshots/movie.png)
