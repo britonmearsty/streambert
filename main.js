@@ -103,6 +103,32 @@ function createWindow() {
     "*://fonts.gstatic.com/*",
     // Videasy-Tracker
     "*://im.malocacomals.com/*",
+    "*://users.videasy.net/*",
+    "*://nf.sixmossin.com/*",
+    // 2embed Ads & Tracker
+    "*://realizationnewestfangs.com/*",
+    "*://acscdn.com/*",
+    "*://lt.taloseempest.com/*",
+    "*://pl26708123.profitableratecpm.com/*",
+    "*://preferencenail.com/*",
+    "*://protrafficinspector.com/*",
+    "*://s10.histats.com/*",
+    "*://weirdopt.com/*",
+    "*://static.cloudflareinsights.com/*",
+    "*://kettledroopingcontinuation.com/*",
+    "*://wayfarerorthodox.com/*",
+    "*://woxaglasuy.net/*",
+    "*://adeptspiritual.com/*",
+    "*://www.calculating-laugh.com/*",
+    "*://amavhxdlofklxjg.xyz/*",
+    // vidsrc Ads & Tracker
+    "*://7jtjubf8p5kq7x3z2.u3qleufcm6vure326ktfpbj.cfd/*",
+    "*://5mq.get64t9vqg8pnbex1y463o.rest/*",
+    "*://usrpubtrk.com/*",
+    "*://adexchangeclear.com/*",
+    "*://rzjzjnavztycv.online/*",
+    "*://tmstr4.cloudnestra.com/*",
+    "*://tmstr4.neonhorizonworkshops.com/*",
   ];
 
   videasySession.webRequest.onBeforeRequest(

@@ -66,9 +66,9 @@ export const PLAYER_SOURCES = [
     tag: null,
     note: null,
     supportsProgress: false,
-    movieUrl: (id) => `https://www.2embed.stream/embed/movie/${id}`,
+    movieUrl: (id) => `https://www.2embed.online/embed/movie/${id}`,
     tvUrl: (id, season, ep) =>
-      `https://www.2embed.stream/embed/tv/${id}/${season}/${ep}`,
+      `https://www.2embed.online/embed/tv/${id}/${season}/${ep}`,
   },
   {
     id: "allmanga",
