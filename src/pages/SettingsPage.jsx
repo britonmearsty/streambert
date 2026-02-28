@@ -50,6 +50,7 @@ export const HOME_ROWS = [
   { id: "similar", label: "Similar to…" },
   { id: "trendingMovies", label: "Trending Movies" },
   { id: "trendingTV", label: "Trending Series" },
+  { id: "topRated", label: "Top Rated" },
 ];
 
 const DEFAULT_ROW_ORDER = HOME_ROWS.map((r) => r.id);
@@ -58,9 +59,27 @@ const DEFAULT_ROW_VISIBLE = Object.fromEntries(
 );
 
 export function loadHomeLayout() {
-  const order = storage.get("homeRowOrder") || DEFAULT_ROW_ORDER;
-  const visible = storage.get("homeRowVisible") || DEFAULT_ROW_VISIBLE;
-  return { order, visible };
+  const savedOrder = storage.get("homeRowOrder");
+  const savedVisible = storage.get("homeRowVisible");
+
+  // Merge saved order: keep existing order, append any new rows at the end
+  const knownIds = new Set(HOME_ROWS.map((r) => r.id));
+  const baseOrder = savedOrder
+    ? [
+        ...savedOrder.filter((id) => knownIds.has(id)), // keep valid saved entries
+        ...DEFAULT_ROW_ORDER.filter((id) => !savedOrder.includes(id)), // append new ones
+      ]
+    : DEFAULT_ROW_ORDER;
+
+  // Merge saved visible: keep saved values, default new keys to true
+  const baseVisible = savedVisible
+    ? {
+        ...DEFAULT_ROW_VISIBLE, // new keys default to true
+        ...savedVisible, // saved values take precedence
+      }
+    : DEFAULT_ROW_VISIBLE;
+
+  return { order: baseOrder, visible: baseVisible };
 }
 
 function saveHomeLayout(order, visible) {
@@ -500,14 +519,14 @@ function VersionSection() {
 
 // ── Home Layout Section ───────────────────────────────────────────────────────
 function HomeLayoutSection() {
-  const [order, setOrder] = useState(
-    () => storage.get("homeRowOrder") || HOME_ROWS.map((r) => r.id),
-  );
-  const [visible, setVisible] = useState(
-    () =>
-      storage.get("homeRowVisible") ||
-      Object.fromEntries(HOME_ROWS.map((r) => [r.id, true])),
-  );
+  const [order, setOrder] = useState(() => {
+    const { order: o } = loadHomeLayout();
+    return o;
+  });
+  const [visible, setVisible] = useState(() => {
+    const { visible: v } = loadHomeLayout();
+    return v;
+  });
   const [saved, setSaved] = useState(false);
   const dragItem = useRef(null);
   const dragOver = useRef(null);

@@ -37,6 +37,7 @@ export default function HomePage({
 
   const [similarItems, setSimilarItems] = useState([]);
   const [similarSource, setSimilarSource] = useState(null);
+  const [topRatedItems, setTopRatedItems] = useState([]);
 
   // Load layout config (order + visibility) once on mount
   const [layout] = useState(() => loadHomeLayout());
@@ -49,8 +50,9 @@ export default function HomePage({
       ...trending.map((i) => ({ ...i, media_type: "movie" })),
       ...trendingTV.map((i) => ({ ...i, media_type: "tv" })),
       ...similarItems,
+      ...topRatedItems,
     ],
-    [inProgress, trending, trendingTV, similarItems],
+    [inProgress, trending, trendingTV, similarItems, topRatedItems],
   );
 
   const { ratingsMap, ageLimitSetting } = useRatings(allItems);
@@ -103,6 +105,39 @@ export default function HomePage({
       );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiKey, offline, history?.length]);
+
+  // Fetch top rated movies + TV, merge and shuffle
+  useEffect(() => {
+    if (!apiKey || offline) return;
+    const controller = new AbortController();
+    Promise.all([
+      tmdbFetch("/movie/top_rated?page=1", apiKey, {
+        signal: controller.signal,
+      }),
+      tmdbFetch("/tv/top_rated?page=1", apiKey, { signal: controller.signal }),
+    ])
+      .then(([moviesData, tvData]) => {
+        const movies = (moviesData.results || [])
+          .slice(0, 15)
+          .map((i) => ({ ...i, media_type: "movie" }));
+        const tv = (tvData.results || [])
+          .slice(0, 15)
+          .map((i) => ({ ...i, media_type: "tv" }));
+        // Interleave movies and TV for variety
+        const merged = [];
+        const max = Math.max(movies.length, tv.length);
+        for (let i = 0; i < max; i++) {
+          if (movies[i]) merged.push(movies[i]);
+          if (tv[i]) merged.push(tv[i]);
+        }
+        setTopRatedItems(merged);
+      })
+      .catch((e) => {
+        if (e.name !== "AbortError") console.warn("Top rated fetch failed", e);
+      });
+    return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiKey, offline]);
 
   // Stable pre-built item arrays for carousels
   const trendingMovieItems = useMemo(
@@ -190,12 +225,44 @@ export default function HomePage({
     );
   };
 
-  const rowRenderers = {
-    continue: renderContinueWatching,
-    similar: renderSimilar,
-    trendingMovies: renderTrendingMovies,
-    trendingTV: renderTrendingTV,
+  const renderTopRated = () => {
+    if (!rowVisible.topRated || topRatedItems.length === 0) return null;
+    return (
+      <TrendingCarousel
+        key="topRated"
+        items={topRatedItems}
+        title="Top Rated"
+        onSelect={onSelect}
+        ratingsMap={enrichedRatingsMap}
+      />
+    );
   };
+
+  const rowRenderers = useMemo(
+    () => ({
+      continue: renderContinueWatching,
+      similar: renderSimilar,
+      trendingMovies: renderTrendingMovies,
+      trendingTV: renderTrendingTV,
+      topRated: renderTopRated,
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }),
+    [
+      inProgress,
+      similarItems,
+      similarSource,
+      trendingMovieItems,
+      trendingTVItems,
+      topRatedItems,
+      enrichedRatingsMap,
+      rowVisible,
+      progress,
+      watched,
+      onSelect,
+      onMarkWatched,
+      onMarkUnwatched,
+    ],
+  );
 
   return (
     <div className="fade-in">
