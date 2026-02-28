@@ -366,11 +366,28 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(createWindow);
-app.on("window-all-closed", () => app.quit());
-app.on("activate", () => {
-  if (mainWindow === null) createWindow();
-});
+// ── Single-Instance Lock ──────────────────────────────────────────────────────
+// Prevents the app from being opened twice.
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  // Another instance is already running → quit right away
+  app.quit();
+} else {
+  // Focus / restore the existing window when the user tries to open a second instance
+  app.on("second-instance", () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
+
+  app.whenReady().then(createWindow);
+  app.on("window-all-closed", () => app.quit());
+  app.on("activate", () => {
+    if (mainWindow === null) createWindow();
+  });
+}
 
 // ── Subtitle file downloader ──────────────────────────────────────────────────
 // Downloads a .vtt or .srt file to destPath. Returns true on success.
