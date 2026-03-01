@@ -42,10 +42,22 @@
       "!**/*.md",
       "!**/node_modules/.cache/**"
     ],
+    "win": {
+      "icon": "public/icon.png",
+      "target": [
+        "nsis"
+      ]
+    },
     "linux": {
       "target": [
         {
           "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
           "arch": [
             "x64"
           ]
