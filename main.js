@@ -1387,7 +1387,7 @@ function anilistSeasonTitle(baseTitle, seasonNumber) {
   return new Promise((resolve) => {
     const resolveS1 = seasonNumber <= 1;
 
-    const query = `query($search:String){Media(search:$search,type:ANIME,sort:SEARCH_MATCH){title{english romaji}relations{edges{relationType node{type format title{english romaji}startDate{year}seasonYear}}}}}`;
+    const query = `query($search:String){Media(search:$search,type:ANIME,sort:SEARCH_MATCH){title{english romaji}episodes relations{edges{relationType node{type format title{english romaji}episodes startDate{year}seasonYear}}}}}`;
     const body = JSON.stringify({ query, variables: { search: baseTitle } });
 
     const opts = {
@@ -1411,15 +1411,17 @@ function anilistSeasonTitle(baseTitle, seasonNumber) {
           // Always capture the S1 romaji as a fallback candidate
           const s1Romaji = media?.title?.romaji || null;
 
-          if (!media) return resolve({ title: baseTitle, romaji: null });
+          if (!media)
+            return resolve({
+              title: baseTitle,
+              romaji: null,
+              episodes: null,
+              nextTitle: null,
+              nextRomaji: null,
+            });
 
-          // For S1 just return the english title + romaji
-          if (resolveS1) {
-            const eng = media.title?.english || baseTitle;
-            return resolve({ title: eng, romaji: s1Romaji });
-          }
+          const s1Episodes = media?.episodes || null;
 
-          // Collect sequels sorted by air year
           const sequels = (media.relations?.edges || [])
             .filter(
               (e) =>
@@ -1433,24 +1435,72 @@ function anilistSeasonTitle(baseTitle, seasonNumber) {
               return ya - yb;
             });
 
-          // seasonNumber=2 -> sequels[0], seasonNumber=3 -> sequels[1], etc.
+          const getSequelTitle = (node) =>
+            node.title?.english || node.title?.romaji || null;
+          const getSequelRomaji = (node) => node.title?.romaji || null;
+
+          if (resolveS1) {
+            const eng = media.title?.english || baseTitle;
+            const nextSequel = sequels[0] ? sequels[0].node : null;
+            return resolve({
+              title: eng,
+              romaji: s1Romaji,
+              episodes: s1Episodes,
+              nextTitle: nextSequel ? getSequelTitle(nextSequel) : null,
+              nextRomaji: nextSequel ? getSequelRomaji(nextSequel) : null,
+            });
+          }
+
           const target = sequels[seasonNumber - 2];
-          if (!target) return resolve({ title: baseTitle, romaji: s1Romaji });
-          const t =
-            target.node.title?.english ||
-            target.node.title?.romaji ||
-            baseTitle;
-          const romaji = target.node.title?.romaji || s1Romaji;
-          resolve({ title: t, romaji });
+          if (!target)
+            return resolve({
+              title: baseTitle,
+              romaji: s1Romaji,
+              episodes: null,
+              nextTitle: null,
+              nextRomaji: null,
+            });
+          const t = getSequelTitle(target.node) || baseTitle;
+          const romaji = getSequelRomaji(target.node) || s1Romaji;
+          const targetEpisodes = target.node.episodes || null;
+          const nextTarget = sequels[seasonNumber - 1];
+          const nextNode = nextTarget ? nextTarget.node : null;
+          resolve({
+            title: t,
+            romaji,
+            episodes: targetEpisodes,
+            nextTitle: nextNode ? getSequelTitle(nextNode) : null,
+            nextRomaji: nextNode ? getSequelRomaji(nextNode) : null,
+          });
         } catch {
-          resolve({ title: baseTitle, romaji: null });
+          resolve({
+            title: baseTitle,
+            romaji: null,
+            episodes: null,
+            nextTitle: null,
+            nextRomaji: null,
+          });
         }
       });
     });
-    req.on("error", () => resolve({ title: baseTitle, romaji: null }));
+    req.on("error", () =>
+      resolve({
+        title: baseTitle,
+        romaji: null,
+        episodes: null,
+        nextTitle: null,
+        nextRomaji: null,
+      }),
+    );
     req.setTimeout(8000, () => {
       req.destroy();
-      resolve({ title: baseTitle, romaji: null });
+      resolve({
+        title: baseTitle,
+        romaji: null,
+        episodes: null,
+        nextTitle: null,
+        nextRomaji: null,
+      });
     });
     req.write(body);
     req.end();
@@ -1468,6 +1518,21 @@ const HARDCODED_SHOW_IDS = {
     "b6xFsr7MDSMcJArB9", // S5
     "pwduJkjBLytqiWCvM", // S6
   ],
+};
+
+// Shows where one TMDB season spans multiple AllManga entries.
+// Key: lowercase TMDB title
+// Value: map of TMDB season number -> ordered array of parts
+// Each part: { from (1-indexed TMDB ep where this part starts),
+//              showId (AllManga ID, null = use title search),
+//              offset (subtract from TMDB ep to get AllManga ep) }
+const SPLIT_SEASONS = {
+  "spy x family": {
+    1: [
+      { from: 1, showId: null, offset: 0 },
+      { from: 13, showId: "H8Aey6QXE7HSqwvW3", offset: 12 },
+    ],
+  },
 };
 
 // Resolve video URL directly from a known AllAnime show ID + episode string.
@@ -1727,35 +1792,77 @@ ipcMain.handle(
     try {
       const season = seasonNumber || 1;
       const dubSub = translationType === "dub" ? "dub" : "sub";
-      // For movies, search AllAnime with episode "1" (movies are listed as single-episode entries)
-      const epStr = isMovie ? "1" : String(episodeNumber);
 
-      // ── Hardcoded lookup for franchises where AllAnime search is unreliable ─
+      if (!isMovie) {
+        const splitParts = SPLIT_SEASONS[title.toLowerCase()]?.[season];
+        if (splitParts) {
+          let activePart = splitParts[0];
+          for (const part of splitParts) {
+            if (episodeNumber >= part.from) activePart = part;
+          }
+          const partEp = episodeNumber - activePart.offset;
+          if (activePart.showId) {
+            const result = await resolveEpisodeFromId(
+              activePart.showId,
+              String(partEp),
+              dubSub,
+            );
+            if (result) return result;
+          }
+        }
+      }
+
       if (!isMovie) {
         const hardcodedIds = HARDCODED_SHOW_IDS[title.toLowerCase()];
         if (hardcodedIds) {
           const showId =
             hardcodedIds[season - 1] ?? hardcodedIds[hardcodedIds.length - 1];
-          const result = await resolveEpisodeFromId(showId, epStr, dubSub);
+          const result = await resolveEpisodeFromId(
+            showId,
+            String(episodeNumber),
+            dubSub,
+          );
           if (result) return result;
         }
       }
 
-      // ── Step 1: Resolve correct title for this season via AniList ────────
-      // For movies, skip sequel resolution (season always 1)
       const anilistResult = isMovie
-        ? { title, romaji: null }
+        ? {
+            title,
+            romaji: null,
+            episodes: null,
+            nextTitle: null,
+            nextRomaji: null,
+          }
         : await anilistSeasonTitle(title, season);
 
-      const searchTitle = anilistResult.title;
+      let searchTitle = anilistResult.title;
+      let adjustedEpisodeNumber = episodeNumber;
+
+      if (
+        !isMovie &&
+        anilistResult.episodes &&
+        episodeNumber > anilistResult.episodes &&
+        anilistResult.nextTitle
+      ) {
+        adjustedEpisodeNumber = episodeNumber - anilistResult.episodes;
+        searchTitle = anilistResult.nextTitle;
+      }
+
+      const epStr = isMovie ? "1" : String(adjustedEpisodeNumber);
 
       // Build ordered list of title candidates to try if the first search fails.
       // Deduplication via Set keeps the list clean.
       const candidateSet = new Set([
         searchTitle,
-        sanitizeTitle(searchTitle), // strip apostrophes etc.
-        ...(anilistResult.romaji ? [anilistResult.romaji] : []),
-        title, // original TMDB title as last resort
+        sanitizeTitle(searchTitle),
+        ...(anilistResult.romaji && searchTitle === anilistResult.title
+          ? [anilistResult.romaji]
+          : []),
+        ...(anilistResult.nextRomaji && searchTitle === anilistResult.nextTitle
+          ? [anilistResult.nextRomaji]
+          : []),
+        title,
         sanitizeTitle(title),
       ]);
       const candidates = [...candidateSet].filter(Boolean);
