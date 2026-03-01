@@ -49,29 +49,52 @@ Media Files for Animes are scraped from AllManga.to (i stole this mechanic from 
 - For downloading, [this Program](https://github.com/truelockmc/video-downloader/releases/latest) somewhere on your PC and [ffmpeg](https://ffmpeg.org/download.html) installed
 
 ---
+## Installation
+On first launch you'll be prompted to enter your TMDB API key. It's saved locally, you only need to do this once.
 
-## Setup & Run
-Option 1: 
-Use a prebuilt Binary from [Releases](https://github.com/truelockmc/streambert/releases/latest)
+### Linux, APT (recommended)
 
-Option 2:
-Use the Source Code
+Add the repository once, then install and update via `apt`:
 ```bash
-# 1. Open a terminal in the Code Folder, then install dependencies:
-npm install
+# Import GPG key
+curl -fsSL https://truelockmc.github.io/streambert/KEY.gpg | sudo gpg --dearmor -o /etc/apt/keyrings/streambert.gpg
 
-# 2. Start the dev server:
-npm start
+# Add repository
+echo "deb [signed-by=/etc/apt/keyrings/streambert.gpg] https://truelockmc.github.io/streambert ./" | sudo tee /etc/apt/sources.list.d/streambert.list
 
+# Install
+sudo apt update && sudo apt install streambert
 ```
 
-On first launch you'll be prompted to enter your TMDB API key. It's saved locally, you only need to do this once.
+Future updates will be applied automatically with:
+```bash
+sudo apt update && sudo apt upgrade
+```
+
+### Linux, Manual (.deb / .AppImage)
+
+Download the latest `.deb` or `.AppImage` from the [Releases](https://github.com/truelockmc/streambert/releases/latest) page.
+```bash
+# .deb
+sudo dpkg -i streambert_*.deb
+
+# .AppImage (you can also do it with Gearlever)
+chmod +x Streambert-x64.AppImage && ./Streambert-x64.AppImage
+```
+
+### Windows
+
+Download the latest `Streambert Setup *.exe` from the [Releases](https://github.com/truelockmc/streambert/releases/latest) page and run it.
 
 ---
 
 
-## Build from Source
-
+## Building from Source
+1. Install dependencies:
+```bash
+npm install
+```
+2. Build
 ```bash
 npm run dist:win
 ```
