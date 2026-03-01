@@ -89,6 +89,15 @@ const downloadsFile = () =>
 // Track running child processes by download id
 const activeProcs = new Map();
 
+const PART_FILE_SUFFIXES = [
+  ".part",
+  ".ytdl",
+  /\.part-Frag\d+$/,
+  /\.part\.\d+$/,
+  /\.part\.tmp$/,
+  /\.tmp$/,
+];
+
 function loadDownloads() {
   try {
     const raw = fs.readFileSync(downloadsFile(), "utf8");
@@ -734,9 +743,18 @@ ipcMain.handle(
         }
 
         // ── Send whatever we gathered (skip if nothing useful) ───────────────
+        // Lines that should never surface in the UI
+        const SUPPRESS_PATTERNS = [
+          /Sleeping\s+[\d.]+\s+seconds/i,
+          /^\[yt-dlp\s+DEBUG\]/i,
+          /^\[debug\]/i,
+        ];
         if (Object.keys(update).length === 0) {
-          // Informational line — just update lastMessage if not already showing frag info
-          if (!downloads[idx].lastMessage.startsWith("Fragment")) {
+          const suppress =
+            downloads[idx].lastMessage.startsWith("Fragment") ||
+            downloads[idx].lastMessage.startsWith("Retrying") ||
+            SUPPRESS_PATTERNS.some((p) => p.test(trimmed));
+          if (!suppress) {
             update.lastMessage = trimmed;
           }
         }
@@ -871,8 +889,31 @@ ipcMain.handle("delete-download", (_, { id, filePath }) => {
       activeProcs.delete(id);
     }
     if (filePath && fs.existsSync(filePath)) fs.unlinkSync(filePath);
-    // Also delete subtitle file if it was downloaded alongside the video
+
+    // Delete part/temp files that belong only to this download.
+    // Derive the base filename: e.g. "Movie.mp4.part" → stem "Movie.mp4"
+
     const dlEntry = downloads.find((d) => d.id === id);
+    const dlDownloadPath = dlEntry?.downloadPath;
+    const partPath = filePath || dlEntry?.filePath;
+    if (dlDownloadPath && partPath) {
+      try {
+        const baseName = path.basename(partPath).replace(/\.part$/, "");
+        const entries = fs.readdirSync(dlDownloadPath);
+        for (const entry of entries) {
+          if (!entry.startsWith(baseName)) continue;
+          const isTempFile = PART_FILE_SUFFIXES.some((p) =>
+            typeof p === "string" ? entry.endsWith(p) : p.test(entry),
+          );
+          if (isTempFile) {
+            try {
+              fs.unlinkSync(path.join(dlDownloadPath, entry));
+            } catch {}
+          }
+        }
+      } catch {}
+    }
+    // Also delete subtitle file if it was downloaded alongside the video
     if (dlEntry?.subtitlePath && fs.existsSync(dlEntry.subtitlePath)) {
       try {
         fs.unlinkSync(dlEntry.subtitlePath);

@@ -75,14 +75,19 @@ export default function SearchModal({ apiKey, onSelect, onClose, offline }) {
     saveHistory([]);
   }, []);
 
-  const handleSelect = useCallback(
-    (r) => {
-      addToHistory(r.title || r.name);
-      onSelect(r);
-      onClose();
-    },
-    [addToHistory, onSelect, onClose],
-  );
+  const handleSelect = (r) => {
+    const trimmed = query.trim();
+    if (trimmed) {
+      const next = [trimmed, ...history.filter((h) => h !== trimmed)].slice(
+        0,
+        MAX_HISTORY,
+      );
+      saveHistory(next);
+      setHistory(next);
+    }
+    onSelect(r);
+    onClose();
+  };
 
   const handleHistoryClick = useCallback((term) => {
     setQuery(term);
