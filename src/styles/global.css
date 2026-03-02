@@ -3292,6 +3292,17 @@ kbd {
     right: auto;
 }
 
+.player-wrap .player-overlay-btn,
+.player-wrap .player-overlay-group {
+    opacity: 0;
+    transition: opacity 0.25s ease;
+}
+
+.player-wrap:hover .player-overlay-btn,
+.player-wrap:hover .player-overlay-group {
+    opacity: 1;
+}
+
 .player-blocked-badge {
     display: inline-flex;
     align-items: center;

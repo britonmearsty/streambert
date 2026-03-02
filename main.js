@@ -817,6 +817,25 @@ ipcMain.handle(
             } catch {}
           }
 
+          // Rename file to proper media name (binary saves using URL-derived name)
+          if (code === 0 && downloads[idx].filePath) {
+            try {
+              const ext = path.extname(downloads[idx].filePath) || ".mp4";
+              // Sanitize: strip characters illegal in filenames on all platforms
+              const safeName = name
+                .replace(/[<>:"/\\|?*\x00-\x1f]/g, "")
+                .replace(/\s+/g, " ")
+                .trim();
+              if (safeName) {
+                const newPath = path.join(downloadPath, safeName + ext);
+                if (newPath !== downloads[idx].filePath) {
+                  fs.renameSync(downloads[idx].filePath, newPath);
+                  downloads[idx].filePath = newPath;
+                }
+              }
+            } catch {}
+          }
+
           // Real file size from disk
           if (downloads[idx].filePath) {
             try {
