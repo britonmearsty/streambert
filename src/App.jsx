@@ -536,6 +536,11 @@ export default function App() {
             highlightId={highlightDownload}
             onClearHighlight={() => setHighlightDownload(null)}
             onSelect={handleSelectResult}
+            onUpdateDownload={(id, updates) =>
+              setDownloads((prev) =>
+                prev.map((d) => (d.id === id ? { ...d, ...updates } : d)),
+              )
+            }
           />
         )}
       </div>

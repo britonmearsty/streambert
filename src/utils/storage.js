@@ -58,5 +58,4 @@ export const STORAGE_KEYS = {
   SUBTITLE_ENABLED: "subtitleDownload",
   SUBTITLE_LANG: "subtitleLang",
   SUBDL_API_KEY: "subdlApiKey",
-  OS_API_KEY: "opensubtitlesApiKey",
 };

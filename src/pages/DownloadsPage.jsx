@@ -8,7 +8,8 @@ import {
   WatchedIcon,
   SubtitlesIcon,
 } from "../components/Icons";
-import { storage } from "../utils/storage";
+import { storage, STORAGE_KEYS } from "../utils/storage";
+import { SUBTITLE_LANGUAGES } from "../utils/subtitles";
 import { imgUrl } from "../utils/api";
 
 const STATUS_CLASS = {
@@ -67,6 +68,7 @@ export default function DownloadsPage({
   highlightId,
   onClearHighlight,
   onSelect,
+  onUpdateDownload,
 }) {
   const [fileExistsCache, setFileExistsCache] = useState({});
   const [localFiles, setLocalFiles] = useState(
@@ -77,6 +79,7 @@ export default function DownloadsPage({
     () => storage.get("downloadPath") || "",
   );
   const highlightRef = useRef(null);
+  const [subtitleModalDl, setSubtitleModalDl] = useState(null);
 
   const isElectron = typeof window !== "undefined" && !!window.electron;
 
@@ -158,6 +161,26 @@ export default function DownloadsPage({
 
   return (
     <div className="fade-in dl-page">
+      {subtitleModalDl && (
+        <SubtitleDownloaderModal
+          dl={subtitleModalDl}
+          onClose={() => setSubtitleModalDl(null)}
+          onSubtitlesSaved={(newPaths) => {
+            onUpdateDownload?.(subtitleModalDl.id, {
+              subtitlePaths: [
+                ...(subtitleModalDl.subtitlePaths || []),
+                ...newPaths.filter(
+                  (np) =>
+                    !(subtitleModalDl.subtitlePaths || []).some(
+                      (e) => e.lang === np.lang,
+                    ),
+                ),
+              ],
+            });
+            setSubtitleModalDl(null);
+          }}
+        />
+      )}
       <div className="dl-page__title">DOWNLOADS</div>
       <div className="dl-page__subtitle">
         {active.length > 0 ? `${active.length} active` : "No active downloads"}{" "}
@@ -275,6 +298,9 @@ export default function DownloadsPage({
                             poster_path: dl.posterPath || null,
                           })
                       : null
+                  }
+                  onOpenSubtitleDownloader={
+                    dl.tmdbId ? () => setSubtitleModalDl(dl) : null
                   }
                 />
               );
@@ -413,6 +439,7 @@ function LocalFileCard({
   onSelect,
   watchedKey,
   onHistory,
+  onOpenSubtitleDownloader,
 }) {
   const isDownload = !dl.isLocalOnly;
   const canWatch = !!fileExists && !!dl.filePath;
@@ -538,33 +565,61 @@ function LocalFileCard({
             )}
             {dl.completedAt && <span>{timeAgo(dl.completedAt)}</span>}
             {dl.size && <span>{dl.size}</span>}
-            {/* Subtitle info */}
-            {dl.subtitlePaths?.length > 0 && (
-              <span
-                title={dl.subtitlePaths
-                  .map((s) => s.lang?.toUpperCase())
-                  .join(", ")}
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  padding: "1px 6px",
-                  borderRadius: 3,
-                  background: "rgba(99,202,183,0.12)",
-                  color: "#63cab7",
-                  border: "1px solid rgba(99,202,183,0.25)",
-                  cursor: "default",
-                  letterSpacing: "0.03em",
-                }}
-              >
-                <SubtitlesIcon
-                  size={11}
-                  style={{ verticalAlign: "middle", marginRight: 3 }}
-                />
-                {dl.subtitlePaths
-                  .map((s) => (s.lang || "?").toUpperCase())
-                  .join(" · ")}
-              </span>
-            )}
+            {/* Subtitle info, always visible, clickable to open downloader */}
+            {(() => {
+              const hasSubs = (dl.subtitlePaths?.length ?? 0) > 0;
+              const langs = hasSubs
+                ? dl.subtitlePaths
+                    .map((s) => (s.lang || "?").toUpperCase())
+                    .join(" · ")
+                : null;
+              return (
+                <span
+                  title={
+                    onOpenSubtitleDownloader
+                      ? hasSubs
+                        ? `Subtitles: ${langs}: click to manage`
+                        : "No subtitles: click to download"
+                      : hasSubs
+                        ? `Subtitles: ${langs}`
+                        : "No subtitles"
+                  }
+                  onClick={onOpenSubtitleDownloader || undefined}
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    padding: "1px 6px",
+                    borderRadius: 3,
+                    background: hasSubs
+                      ? "rgba(99,202,183,0.12)"
+                      : "rgba(255,255,255,0.04)",
+                    color: hasSubs ? "#63cab7" : "var(--text3)",
+                    border: hasSubs
+                      ? "1px solid rgba(99,202,183,0.25)"
+                      : "1px solid var(--border)",
+                    cursor: onOpenSubtitleDownloader ? "pointer" : "default",
+                    letterSpacing: "0.03em",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 3,
+                    transition: "opacity 0.15s",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (onOpenSubtitleDownloader)
+                      e.currentTarget.style.opacity = "0.75";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.opacity = "1";
+                  }}
+                >
+                  <SubtitlesIcon
+                    size={10}
+                    style={{ verticalAlign: "middle" }}
+                  />
+                  {hasSubs ? langs : "No subtitles"}
+                </span>
+              );
+            })()}
             {fileExists === false && (
               <span className="dl-status--missing">File missing</span>
             )}
@@ -650,6 +705,433 @@ function LocalFileCard({
               <TrashIcon />
             </button>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Subtitle Downloader Modal (for retroactive subtitle download) ──────────────
+function SubtitleDownloaderModal({ dl, onClose, onSubtitlesSaved }) {
+  const subdlApiKey = storage.get(STORAGE_KEYS.SUBDL_API_KEY) || "";
+  const defaultLang = storage.get(STORAGE_KEYS.SUBTITLE_LANG) || "en";
+
+  const [langFilter, setLangFilter] = useState(defaultLang);
+  const [results, setResults] = useState(null);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState(null);
+  const [selectedSubs, setSelectedSubs] = useState([]);
+  const [downloading, setDownloading] = useState(false);
+  const [dlError, setDlError] = useState(null);
+  const [done, setDone] = useState(false);
+
+  const doSearch = useCallback(
+    async (lang) => {
+      if (!dl.tmdbId) return;
+      setSearching(true);
+      setSearchError(null);
+      setResults(null);
+      try {
+        const res = await window.electron.searchSubtitles({
+          tmdbId: dl.tmdbId,
+          mediaType: dl.mediaType,
+          season: dl.season,
+          episode: dl.episode,
+          languages: lang || "",
+          subdlApiKey,
+        });
+        if (!res.ok) {
+          setSearchError(res.error || "Search failed");
+          setResults([]);
+        } else setResults(res.results || []);
+      } catch (e) {
+        setSearchError(e.message);
+        setResults([]);
+      } finally {
+        setSearching(false);
+      }
+    },
+    [dl, subdlApiKey],
+  );
+
+  useEffect(() => {
+    doSearch(langFilter);
+  }, []);
+
+  const handleDownload = async () => {
+    if (!selectedSubs.length || !dl.filePath) return;
+    setDownloading(true);
+    setDlError(null);
+    try {
+      const res = await window.electron.downloadSubtitlesForFile({
+        filePath: dl.filePath,
+        selectedSubs,
+      });
+      if (res.ok && res.subtitlePaths?.length > 0) {
+        setDone(true);
+        setTimeout(() => onSubtitlesSaved(res.subtitlePaths), 900);
+      } else {
+        setDlError(res.error || "No subtitles could be saved.");
+      }
+    } catch (e) {
+      setDlError(e.message);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 999999,
+        background: "rgba(0,0,0,0.78)",
+        backdropFilter: "blur(6px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          background: "var(--surface)",
+          border: "1px solid var(--border)",
+          borderRadius: 12,
+          width: 600,
+          maxWidth: "95vw",
+          maxHeight: "82vh",
+          display: "flex",
+          flexDirection: "column",
+          boxShadow: "0 24px 64px rgba(0,0,0,0.6)",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "15px 20px",
+            borderBottom: "1px solid var(--border)",
+            flexShrink: 0,
+          }}
+        >
+          <span
+            style={{
+              fontWeight: 600,
+              fontSize: 14,
+              display: "flex",
+              alignItems: "center",
+              gap: 7,
+            }}
+          >
+            <SubtitlesIcon size={14} />
+            Subtitles: {dl.name}
+            {selectedSubs.length > 0 && (
+              <span style={{ fontSize: 12, color: "var(--text3)" }}>
+                · {selectedSubs.length} selected
+              </span>
+            )}
+          </span>
+          <button className="icon-btn" onClick={onClose}>
+            ✕
+          </button>
+        </div>
+
+        {/* Already-downloaded note */}
+        {(dl.subtitlePaths?.length ?? 0) > 0 && (
+          <div
+            style={{
+              padding: "8px 20px",
+              borderBottom: "1px solid var(--border)",
+              fontSize: 12,
+              color: "#63cab7",
+              background: "rgba(99,202,183,0.05)",
+            }}
+          >
+            Already downloaded:{" "}
+            {dl.subtitlePaths
+              .map((s) => (s.lang || "?").toUpperCase())
+              .join(", ")}
+          </div>
+        )}
+
+        {/* Lang filter */}
+        <div
+          style={{
+            padding: "10px 16px",
+            borderBottom: "1px solid var(--border)",
+            display: "flex",
+            gap: 8,
+            alignItems: "center",
+            flexShrink: 0,
+          }}
+        >
+          <span style={{ fontSize: 12, color: "var(--text3)" }}>Language:</span>
+          <select
+            value={langFilter}
+            onChange={(e) => {
+              setLangFilter(e.target.value);
+              doSearch(e.target.value);
+            }}
+            style={{
+              background: "var(--surface2)",
+              border: "1px solid var(--border)",
+              borderRadius: 6,
+              color: "var(--text)",
+              padding: "5px 10px",
+              fontSize: 12,
+              cursor: "pointer",
+            }}
+          >
+            <option value="">All languages</option>
+            {SUBTITLE_LANGUAGES.map((l) => (
+              <option key={l.code} value={l.code}>
+                {l.label}
+              </option>
+            ))}
+          </select>
+          <button
+            className="btn btn-ghost"
+            style={{ padding: "4px 10px", fontSize: 11 }}
+            onClick={() => doSearch(langFilter)}
+            disabled={searching}
+          >
+            {searching ? "…" : "⟳ Refresh"}
+          </button>
+        </div>
+
+        {/* Results list */}
+        <div style={{ flex: 1, overflowY: "auto" }}>
+          {searching && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: 24,
+                color: "var(--text3)",
+                fontSize: 13,
+                justifyContent: "center",
+              }}
+            >
+              <div
+                className="spinner"
+                style={{ width: 16, height: 16, borderWidth: 2 }}
+              />{" "}
+              Searching…
+            </div>
+          )}
+          {searchError && !searching && (
+            <div
+              style={{
+                padding: "16px 20px",
+                color: "var(--red)",
+                fontSize: 13,
+              }}
+            >
+              ⚠ {searchError}
+            </div>
+          )}
+          {!searching && results?.length === 0 && (
+            <div
+              style={{
+                padding: 20,
+                color: "var(--text3)",
+                fontSize: 13,
+                textAlign: "center",
+              }}
+            >
+              No subtitles found for this language
+            </div>
+          )}
+          {!searching &&
+            results?.map((r) => {
+              const isSelected = selectedSubs.some(
+                (s) => s.file_id === r.file_id,
+              );
+              return (
+                <div
+                  key={r.file_id}
+                  onClick={() =>
+                    setSelectedSubs((prev) =>
+                      isSelected
+                        ? prev.filter((s) => s.file_id !== r.file_id)
+                        : [...prev, r],
+                    )
+                  }
+                  style={{
+                    padding: "8px 16px",
+                    cursor: "pointer",
+                    borderBottom: "1px solid var(--border)",
+                    background: isSelected
+                      ? "rgba(229,9,20,0.07)"
+                      : "transparent",
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 10,
+                    transition: "background 0.1s",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isSelected)
+                      e.currentTarget.style.background = "var(--surface2)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = isSelected
+                      ? "rgba(229,9,20,0.07)"
+                      : "transparent";
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 15,
+                      height: 15,
+                      borderRadius: 3,
+                      border: `2px solid ${isSelected ? "var(--red)" : "var(--border)"}`,
+                      background: isSelected ? "var(--red)" : "transparent",
+                      flexShrink: 0,
+                      marginTop: 3,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    {isSelected && (
+                      <span style={{ color: "#fff", fontSize: 9 }}>✓</span>
+                    )}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 5,
+                        marginBottom: 2,
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          padding: "1px 5px",
+                          borderRadius: 3,
+                          background: "rgba(99,202,183,0.15)",
+                          color: "#63cab7",
+                          border: "1px solid rgba(99,202,183,0.3)",
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        {r.language}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 9,
+                          fontWeight: 700,
+                          padding: "1px 5px",
+                          borderRadius: 3,
+                          background: r.via_subdl
+                            ? "rgba(99,149,255,0.15)"
+                            : "rgba(180,130,255,0.15)",
+                          color: r.via_subdl ? "#6395ff" : "#b482ff",
+                          border: `1px solid ${r.via_subdl ? "rgba(99,149,255,0.3)" : "rgba(180,130,255,0.3)"}`,
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        {r.via_subdl ? "SubDL" : "Wyzie"}
+                      </span>
+                      {r.hearing_impaired && (
+                        <span
+                          style={{ fontSize: 10, color: "var(--text3)" }}
+                          title="HI"
+                        >
+                          ♿
+                        </span>
+                      )}
+                      {r.ai_translated && (
+                        <span
+                          style={{ fontSize: 10, color: "var(--text3)" }}
+                          title="AI"
+                        >
+                          🤖
+                        </span>
+                      )}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: "var(--text)",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {r.release ||
+                        r.file_name ||
+                        `${r.language?.toUpperCase()} subtitle`}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--text3)" }}>
+                      {r.uploader} · {(r.download_count || 0).toLocaleString()}{" "}
+                      downloads
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+        </div>
+
+        {/* Footer */}
+        <div
+          style={{
+            padding: "12px 20px",
+            borderTop: "1px solid var(--border)",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            flexShrink: 0,
+          }}
+        >
+          {done ? (
+            <span style={{ fontSize: 13, color: "#48c774", fontWeight: 600 }}>
+              ✓ Subtitles downloaded!
+            </span>
+          ) : (
+            <>
+              <button
+                className="btn btn-primary"
+                disabled={
+                  downloading || selectedSubs.length === 0 || !dl.filePath
+                }
+                onClick={handleDownload}
+                style={{
+                  opacity: downloading || selectedSubs.length === 0 ? 0.5 : 1,
+                }}
+              >
+                {downloading
+                  ? "Downloading…"
+                  : selectedSubs.length > 0
+                    ? `↓ Download (${selectedSubs.length})`
+                    : "Select subtitles above"}
+              </button>
+              {!dl.filePath && (
+                <span style={{ fontSize: 12, color: "var(--red)" }}>
+                  No file path, needs completed download
+                </span>
+              )}
+              {dlError && (
+                <span style={{ fontSize: 12, color: "var(--red)" }}>
+                  ⚠ {dlError}
+                </span>
+              )}
+            </>
+          )}
+          <div style={{ flex: 1 }} />
+          <button className="btn btn-ghost" onClick={onClose}>
+            Close
+          </button>
         </div>
       </div>
     </div>

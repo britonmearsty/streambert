@@ -95,7 +95,9 @@ contextBridge.exposeInMainWorld("electron", {
   clearWatchData: () => ipcRenderer.invoke("clear-watch-data"),
   deleteAllDownloads: () => ipcRenderer.invoke("delete-all-downloads"),
   resetApp: () => ipcRenderer.invoke("reset-app"),
-  // OpenSubtitles
+  // Subtitles
   searchSubtitles: (args) => ipcRenderer.invoke("search-subtitles", args),
   getSubtitleUrl: (args) => ipcRenderer.invoke("get-subtitle-url", args),
+  downloadSubtitlesForFile: (args) =>
+    ipcRenderer.invoke("download-subtitles-for-file", args),
 });

@@ -9,12 +9,11 @@ import {
 } from "../utils/subtitles";
 
 // ── Subtitle Browser (standalone component to avoid re-mount on parent re-render) ──
-function SubtitleBrowser({
+export function SubtitleBrowser({
   tmdbId,
   mediaType,
   season,
   episode,
-  osApiKey,
   subdlApiKey,
   selectedSubs,
   setSelectedSubs,
@@ -36,7 +35,6 @@ function SubtitleBrowser({
         season,
         episode,
         languages: lang || "",
-        apiKey: osApiKey,
         subdlApiKey,
       });
       if (!res.ok) {
@@ -392,7 +390,6 @@ export default function DownloadModal({
       storage.get(STORAGE_KEYS.SUBTITLE_ENABLED) !== 0 &&
       storage.get(STORAGE_KEYS.SUBTITLE_ENABLED) !== "0",
   );
-  const [osApiKey] = useState(() => storage.get(STORAGE_KEYS.OS_API_KEY) || "");
   const [subdlApiKey] = useState(
     () => storage.get(STORAGE_KEYS.SUBDL_API_KEY) || "",
   );
@@ -439,7 +436,6 @@ export default function DownloadModal({
           season,
           episode,
           languages: lang,
-          apiKey: osApiKey,
           subdlApiKey,
         });
         if (!res.ok) {
@@ -464,7 +460,7 @@ export default function DownloadModal({
         setSubSearching(false);
       }
     },
-    [canSearchOS, tmdbId, mediaType, season, episode, osApiKey, subdlApiKey],
+    [canSearchOS, tmdbId, mediaType, season, episode, subdlApiKey],
   );
 
   useEffect(() => {
@@ -498,7 +494,6 @@ export default function DownloadModal({
           if (!url && sub.file_id) {
             const urlRes = await window.electron.getSubtitleUrl({
               fileId: sub.file_id,
-              apiKey: osApiKey,
             });
             if (urlRes.ok) url = urlRes.url;
           }
@@ -957,7 +952,7 @@ export default function DownloadModal({
                           </button>
                         </div>
                       )}
-                    {!subdlApiKey && !osApiKey && (
+                    {!subdlApiKey && (
                       <div
                         style={{
                           marginTop: 5,
@@ -1129,7 +1124,6 @@ export default function DownloadModal({
           mediaType={mediaType}
           season={season}
           episode={episode}
-          osApiKey={osApiKey}
           subdlApiKey={subdlApiKey}
           selectedSubs={selectedSubs}
           setSelectedSubs={setSelectedSubs}

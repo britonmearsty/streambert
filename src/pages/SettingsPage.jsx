@@ -762,20 +762,17 @@ function SubtitleSettingsSection() {
   const [lang, setLang] = useState(
     () => storage.get(STORAGE_KEYS.SUBTITLE_LANG) || "en",
   );
-  const [apiKey, setApiKey] = useState(
-    () => storage.get(STORAGE_KEYS.OS_API_KEY) || "",
-  );
   const [subdlApiKey, setSubdlApiKey] = useState(
     () => storage.get(STORAGE_KEYS.SUBDL_API_KEY) || "",
   );
-  const [showKey, setShowKey] = useState(false);
   const [showSubdlKey, setShowSubdlKey] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  const hasSubdlKey = subdlApiKey.trim().length > 0;
 
   const handleSave = () => {
     storage.set(STORAGE_KEYS.SUBTITLE_ENABLED, enabled ? 1 : 0);
     storage.set(STORAGE_KEYS.SUBTITLE_LANG, lang);
-    storage.set(STORAGE_KEYS.OS_API_KEY, apiKey.trim());
     storage.set(STORAGE_KEYS.SUBDL_API_KEY, subdlApiKey.trim());
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -784,26 +781,20 @@ function SubtitleSettingsSection() {
   return (
     <div style={{ marginBottom: 40 }}>
       <div className="settings-section-title">Subtitle Downloads</div>
+
+      {/* Source info */}
       <div
         style={{
           fontSize: 13,
           color: "var(--text3)",
           marginBottom: 20,
-          lineHeight: 1.6,
+          lineHeight: 1.7,
         }}
       >
-        Automatically find and download subtitles via{" "}
-        <span
-          style={{
-            color: "var(--red)",
-            cursor: "pointer",
-            textDecoration: "underline",
-          }}
-          onClick={() => window.electron?.openExternal("https://subdl.com")}
-        >
-          SubDL
+        <span style={{ color: "var(--text)", fontWeight: 600 }}>
+          Wyzie Subs
         </span>{" "}
-        (Subscene library) and{" "}
+        is used by default — no account or API key required. Optionally add a{" "}
         <span
           style={{
             color: "var(--red)",
@@ -811,14 +802,30 @@ function SubtitleSettingsSection() {
             textDecoration: "underline",
           }}
           onClick={() =>
-            window.electron?.openExternal(
-              "https://www.opensubtitles.com/en/consumers",
-            )
+            window.electron?.openExternal("https://subdl.com/settings")
           }
         >
-          OpenSubtitles
-        </span>
-        . SubDL is recommended: free key, huge library.
+          SubDL API key
+        </span>{" "}
+        (free) to use SubDL as the primary source instead — it has a larger
+        library from Subscene.
+        {hasSubdlKey && (
+          <span
+            style={{
+              display: "inline-block",
+              marginLeft: 8,
+              fontSize: 11,
+              fontWeight: 700,
+              padding: "1px 7px",
+              borderRadius: 3,
+              background: "rgba(99,149,255,0.15)",
+              color: "#6395ff",
+              border: "1px solid rgba(99,149,255,0.3)",
+            }}
+          >
+            SubDL ACTIVE
+          </span>
+        )}
       </div>
 
       {/* Enable toggle */}
@@ -900,8 +907,8 @@ function SubtitleSettingsSection() {
             </select>
           </div>
 
-          {/* SubDL API key (primary source) */}
-          <div style={{ marginBottom: 16 }}>
+          {/* SubDL API key */}
+          <div style={{ marginBottom: 8 }}>
             <div
               style={{ fontSize: 12, color: "var(--text3)", marginBottom: 6 }}
             >
@@ -925,20 +932,33 @@ function SubtitleSettingsSection() {
                   fontWeight: 700,
                   padding: "1px 5px",
                   borderRadius: 3,
-                  background: "rgba(99,149,255,0.15)",
-                  color: "#6395ff",
-                  border: "1px solid rgba(99,149,255,0.3)",
+                  background: "rgba(99,202,183,0.12)",
+                  color: "#63cab7",
+                  border: "1px solid rgba(99,202,183,0.25)",
                 }}
               >
-                RECOMMENDED
+                OPTIONAL
               </span>
+            </div>
+            <div
+              style={{
+                fontSize: 12,
+                color: "var(--text3)",
+                marginBottom: 8,
+                lineHeight: 1.5,
+              }}
+            >
+              Leave empty to use{" "}
+              <strong style={{ color: "var(--text)" }}>Wyzie Subs</strong>{" "}
+              (default, no key needed). Add a SubDL key to switch to SubDL as
+              the primary source.
             </div>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <input
                 className="apikey-input"
                 style={{ flex: 1, maxWidth: 400, marginBottom: 0 }}
                 type={showSubdlKey ? "text" : "password"}
-                placeholder="Primary source: Subscene library, generous limits"
+                placeholder="SubDL API key — leave empty to use Wyzie"
                 value={subdlApiKey}
                 onChange={(e) => setSubdlApiKey(e.target.value)}
               />
@@ -949,46 +969,20 @@ function SubtitleSettingsSection() {
               >
                 {showSubdlKey ? "Hide" : "Show"}
               </button>
-            </div>
-          </div>
-
-          {/* OpenSubtitles API key (secondary/optional) */}
-          <div style={{ marginBottom: 16 }}>
-            <div
-              style={{ fontSize: 12, color: "var(--text3)", marginBottom: 6 }}
-            >
-              OpenSubtitles API key{" "}
-              <span
-                style={{
-                  color: "var(--text3)",
-                  cursor: "pointer",
-                  fontSize: 11,
-                }}
-                onClick={() =>
-                  window.electron?.openExternal(
-                    "https://www.opensubtitles.com/en/consumers",
-                  )
-                }
-              >
-                (optional, get one free ↗)
-              </span>
-            </div>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <input
-                className="apikey-input"
-                style={{ flex: 1, maxWidth: 400, marginBottom: 0 }}
-                type={showKey ? "text" : "password"}
-                placeholder="Optional secondary source"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-              />
-              <button
-                className="btn btn-ghost"
-                style={{ padding: "6px 12px", fontSize: 12 }}
-                onClick={() => setShowKey((v) => !v)}
-              >
-                {showKey ? "Hide" : "Show"}
-              </button>
+              {subdlApiKey.trim() && (
+                <button
+                  className="btn btn-ghost"
+                  style={{
+                    padding: "6px 12px",
+                    fontSize: 12,
+                    color: "var(--text3)",
+                  }}
+                  onClick={() => setSubdlApiKey("")}
+                  title="Clear key (revert to Wyzie)"
+                >
+                  Clear
+                </button>
+              )}
             </div>
           </div>
         </>
