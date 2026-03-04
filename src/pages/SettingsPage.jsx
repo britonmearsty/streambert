@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import UpdateModal from "../components/UpdateModal";
 import { storage, STORAGE_KEYS, secureStorage } from "../utils/storage";
 import { SUBTITLE_LANGUAGES } from "../utils/subtitles";
 import { DEFAULT_INVIDIOUS_BASE } from "../components/TrailerModal";
@@ -19,29 +20,56 @@ const GITHUB_REPO = "truelockmc/streambert";
 function normaliseVersion(v) {
   const parts = String(v).replace(/^v/i, "").split(".");
   while (parts.length < 3) parts.push("0");
-  return parts.slice(0, 3).map(Number).join(".");
+  return parts.slice(0, 3).map(Number);
+}
+
+// Returns true only when `a` is strictly greater than `b` (semver)
+function semverGt(a, b) {
+  for (let i = 0; i < 3; i++) {
+    if (a[i] > b[i]) return true;
+    if (a[i] < b[i]) return false;
+  }
+  return false; // equal
 }
 
 export async function checkForUpdates() {
   const res = await fetch(
-    `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`,
+    `https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=10`,
     {
       headers: { Accept: "application/vnd.github+json" },
       signal: AbortSignal.timeout(8000),
     },
   );
   if (!res.ok) throw new Error(`GitHub API error ${res.status}`);
-  const data = await res.json();
+  const releases = await res.json();
+  // Skip pre-releases and drafts, only consider stable, published releases
+  const data = Array.isArray(releases)
+    ? releases.find((r) => !r.prerelease && !r.draft)
+    : null;
+  if (!data) throw new Error("No stable release found");
   const latestRaw = (data.tag_name || "").replace(/^v/i, "");
-  const latest = normaliseVersion(latestRaw);
-  const current = normaliseVersion(APP_VERSION);
+  const latestParts = normaliseVersion(latestRaw);
+  const currentParts = normaliseVersion(APP_VERSION);
   const url =
     data.html_url || `https://github.com/${GITHUB_REPO}/releases/latest`;
+
+  // Map release assets to install formats
+  const assets = {};
+  for (const asset of data.assets || []) {
+    const name = asset.name.toLowerCase();
+    if (name.endsWith(".appimage"))
+      assets.appimage = asset.browser_download_url;
+    else if (name.endsWith(".deb")) assets.deb = asset.browser_download_url;
+    else if (name.endsWith(".exe")) assets.exe = asset.browser_download_url;
+  }
+
   return {
     latest: latestRaw || APP_VERSION,
     current: APP_VERSION,
     url,
-    hasUpdate: latest !== current && latestRaw !== "",
+    changelog: data.body || "",
+    assets,
+    hasUpdate: latestRaw !== "" && semverGt(latestParts, currentParts),
   };
 }
 
@@ -447,6 +475,7 @@ function formatBytes(bytes) {
 function VersionSection() {
   const [checking, setChecking] = useState(false);
   const [result, setResult] = useState(null); // { latest, current, url, hasUpdate } | { error }
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [autoCheck, setAutoCheck] = useState(
     () => !!storage.get("autoCheckUpdates"),
   );
@@ -525,10 +554,8 @@ function VersionSection() {
         </button>
 
         {result && !result.error && result.hasUpdate && (
-          <a
-            href={result.url}
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            onClick={() => setShowUpdateModal(true)}
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -540,7 +567,7 @@ function VersionSection() {
               padding: "6px 14px",
               fontSize: 13,
               fontWeight: 600,
-              textDecoration: "none",
+              cursor: "pointer",
               transition: "background 0.2s",
             }}
             onMouseEnter={(e) =>
@@ -550,8 +577,8 @@ function VersionSection() {
               (e.currentTarget.style.background = "rgba(229,9,20,0.12)")
             }
           >
-            🎉 v{result.latest} available Download
-          </a>
+            🎉 v{result.latest} available. Install Update
+          </button>
         )}
 
         {result && !result.error && !result.hasUpdate && (
@@ -566,6 +593,13 @@ function VersionSection() {
           </span>
         )}
       </div>
+
+      {showUpdateModal && result?.hasUpdate && (
+        <UpdateModal
+          updateInfo={result}
+          onClose={() => setShowUpdateModal(false)}
+        />
+      )}
 
       {/* Auto-check toggle */}
       <div

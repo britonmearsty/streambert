@@ -2765,3 +2765,189 @@ ipcMain.handle("window-is-maximized", () => {
 });
 
 ipcMain.handle("get-platform", () => process.platform);
+
+// ── Auto-Updater ──────────────────────────────────────────────────────────────
+
+let _updateAbortController = null;
+
+// Detect which install format is currently running
+// - Windows: always "exe" (NSIS)
+// - Linux + APPIMAGE env: "appimage"
+// - Linux without APPIMAGE env: "deb"
+ipcMain.handle("detect-update-format", () => {
+  const platform = process.platform;
+  if (platform === "win32") return "exe";
+  if (platform === "linux") {
+    return process.env.APPIMAGE ? "appimage" : "deb";
+  }
+  return null;
+});
+
+// Download a release asset and trigger the appropriate installer
+ipcMain.handle("download-and-install-update", async (_, { url, format }) => {
+  try {
+    _updateAbortController = new AbortController();
+    const { signal } = _updateAbortController;
+
+    // ── Download to temp file ────────────────────────────────────────────────
+    const ext =
+      format === "exe" ? ".exe" : format === "deb" ? ".deb" : ".AppImage";
+    const destPath = path.join(os.tmpdir(), `streambert-update${ext}`);
+
+    // Fetch with progress reporting
+    const nodeHttps = require("https");
+    const nodeHttp = require("http");
+
+    await new Promise((resolve, reject) => {
+      if (signal.aborted) return reject(new Error("Cancelled"));
+
+      const doRequest = (reqUrl) => {
+        const lib = reqUrl.startsWith("https") ? nodeHttps : nodeHttp;
+        const req = lib.get(
+          reqUrl,
+          {
+            headers: {
+              "User-Agent": "Streambert-AutoUpdater",
+              Accept: "application/octet-stream",
+            },
+          },
+          (res) => {
+            // Follow redirect
+            if (
+              res.statusCode >= 300 &&
+              res.statusCode < 400 &&
+              res.headers.location
+            ) {
+              res.resume();
+              doRequest(
+                res.headers.location.startsWith("http")
+                  ? res.headers.location
+                  : new URL(res.headers.location, reqUrl).toString(),
+              );
+              return;
+            }
+            if (res.statusCode !== 200) {
+              res.resume();
+              return reject(new Error(`HTTP ${res.statusCode}`));
+            }
+
+            const total = parseInt(res.headers["content-length"] || "0", 10);
+            let downloaded = 0;
+            const file = fs.createWriteStream(destPath);
+
+            res.on("data", (chunk) => {
+              if (signal.aborted) {
+                req.destroy();
+                file.destroy();
+                reject(new Error("Cancelled"));
+                return;
+              }
+              downloaded += chunk.length;
+              file.write(chunk);
+              const percent =
+                total > 0 ? Math.round((downloaded / total) * 100) : 0;
+              const mb = (downloaded / 1e6).toFixed(1);
+              const totalMb =
+                total > 0 ? `/ ${(total / 1e6).toFixed(1)} MB` : "";
+              if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.send("update-progress", {
+                  percent,
+                  label: `Downloading… ${mb} MB ${totalMb}`,
+                });
+              }
+            });
+
+            res.on("end", () => {
+              file.end();
+              file.on("finish", resolve);
+              file.on("error", reject);
+            });
+            res.on("error", reject);
+            req.on("error", reject);
+          },
+        );
+        req.on("error", reject);
+      };
+
+      doRequest(url);
+    });
+
+    if (signal.aborted) return { ok: false, error: "Cancelled" };
+
+    // ── Run installer ────────────────────────────────────────────────────────
+    if (format === "appimage") {
+      // AppImage: no admin needed
+      fs.chmodSync(destPath, 0o755);
+      const currentAppImage = process.env.APPIMAGE;
+      if (currentAppImage) {
+        fs.copyFileSync(destPath, currentAppImage);
+        fs.chmodSync(currentAppImage, 0o755);
+        app.relaunch({ execPath: currentAppImage });
+        app.exit(0);
+      } else {
+        spawn(destPath, [], { detached: true, stdio: "ignore" }).unref();
+        app.exit(0);
+      }
+    } else if (format === "deb") {
+      // .deb: needs admin, try pkexec dpkg, fall back to pkexec apt, then gdebi
+      fs.chmodSync(destPath, 0o644);
+      const debLaunchers = [
+        // pkexec dpkg -i (most direct, works on all distros with polkit)
+        { bin: "pkexec", args: ["dpkg", "-i", destPath] },
+        // pkexec apt install (handles deps)
+        { bin: "pkexec", args: ["apt", "install", "-y", destPath] },
+        // gdebi-gtk (GUI installer with dep handling)
+        { bin: "gdebi-gtk", args: [destPath] },
+        // gdebi CLI via pkexec
+        { bin: "pkexec", args: ["gdebi", "-n", destPath] },
+      ];
+      let launched = false;
+      for (const { bin, args } of debLaunchers) {
+        try {
+          const which = spawnSync(
+            process.platform === "win32" ? "where" : "which",
+            [bin],
+            { encoding: "utf8" },
+          );
+          if (which.status !== 0) continue;
+          spawn(bin, args, { detached: true, stdio: "ignore" }).unref();
+          launched = true;
+          break;
+        } catch {
+          continue;
+        }
+      }
+      if (!launched) {
+        // Last resort: open with system default handler (software-center etc.)
+        shell.openPath(destPath);
+      }
+      // Keep app running so user can see terminal output / confirm dialog
+    } else if (format === "exe") {
+      // Windows NSIS installer: request UAC elevation via runas verb
+      // shell.openPath uses ShellExecute which respects the exe's requireAdministrator manifest
+      // For extra certainty we use the "runas" verb via PowerShell
+      const psCmd = `Start-Process -FilePath '${destPath}' -Verb RunAs`;
+      try {
+        spawn("powershell.exe", ["-NoProfile", "-Command", psCmd], {
+          detached: true,
+          stdio: "ignore",
+          windowsHide: false,
+        }).unref();
+      } catch {
+        // Fallback: plain ShellExecute (still triggers UAC if manifest requires it)
+        spawn(destPath, [], { detached: true, stdio: "ignore" }).unref();
+      }
+      app.exit(0);
+    }
+
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  } finally {
+    _updateAbortController = null;
+  }
+});
+
+ipcMain.handle("cancel-update", () => {
+  _updateAbortController?.abort();
+});

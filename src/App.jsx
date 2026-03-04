@@ -9,6 +9,7 @@ import Sidebar from "./components/Sidebar";
 import SearchModal from "./components/SearchModal";
 import SetupScreen from "./components/SetupScreen";
 import CloseConfirmModal from "./components/CloseConfirmModal";
+import UpdateModal from "./components/UpdateModal";
 
 import HomePage from "./pages/HomePage";
 import MoviePage from "./pages/MoviePage";
@@ -41,7 +42,8 @@ export default function App() {
   const [history, setHistory] = useState(() => storage.get("history") || []);
   const [watched, setWatched] = useState(() => storage.get("watched") || {});
   const [toast, setToast] = useState(null);
-  const [updateBanner, setUpdateBanner] = useState(null); // { latest, url }
+  const [updateBanner, setUpdateBanner] = useState(null);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
 
   const [trending, setTrending] = useState([]);
   const [trendingTV, setTrendingTV] = useState([]);
@@ -53,7 +55,7 @@ export default function App() {
     if (!storage.get("autoCheckUpdates")) return;
     checkForUpdates()
       .then((r) => {
-        if (r.hasUpdate) setUpdateBanner({ latest: r.latest, url: r.url });
+        if (r.hasUpdate) setUpdateBanner(r);
       })
       .catch(() => {}); // silently ignore network errors on startup
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -661,10 +663,8 @@ export default function App() {
             }}
           >
             <span>🎉 Streambert v{updateBanner.latest} is available!</span>
-            <a
-              href={updateBanner.url}
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              onClick={() => setShowUpdateModal(true)}
               style={{
                 color: "#fff",
                 fontWeight: 700,
@@ -672,12 +672,12 @@ export default function App() {
                 border: "1px solid rgba(255,255,255,0.4)",
                 borderRadius: 6,
                 padding: "4px 12px",
-                textDecoration: "none",
                 fontSize: 13,
+                cursor: "pointer",
               }}
             >
-              Download
-            </a>
+              Install Update
+            </button>
             <button
               onClick={() => setUpdateBanner(null)}
               style={{
@@ -694,6 +694,13 @@ export default function App() {
               ×
             </button>
           </div>
+        )}
+        {showUpdateModal && updateBanner && (
+          <UpdateModal
+            updateInfo={updateBanner}
+            activeDownloads={activeDownloadCount}
+            onClose={() => setShowUpdateModal(false)}
+          />
         )}
         {toast && <div className="toast">{toast}</div>}
         {closeConfirm && (
