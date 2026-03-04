@@ -109,7 +109,9 @@ function loadDownloads() {
 
 function saveDownloads() {
   try {
-    const toSave = downloads.filter((d) => d.status !== "downloading");
+    const toSave = downloads.filter(
+      (d) => d.status !== "downloading" && d.status !== "error",
+    );
     fs.writeFileSync(downloadsFile(), JSON.stringify(toSave, null, 2));
   } catch {}
 }
@@ -500,6 +502,16 @@ function downloadSubtitleFile(url, destPath) {
   return new Promise((resolve) => {
     try {
       const parsedUrl = new URL(url);
+      if (parsedUrl.protocol === "file:") {
+        try {
+          const src = decodeURIComponent(parsedUrl.pathname);
+          fs.copyFileSync(src, destPath);
+          resolve(true);
+        } catch {
+          resolve(false);
+        }
+        return;
+      }
       const lib = parsedUrl.protocol === "https:" ? https : http;
       const req = lib.get(
         url,
@@ -953,9 +965,10 @@ ipcMain.handle(
             downloads[idx].subtitles?.length > 0 &&
             downloads[idx].filePath
           ) {
-            const videoBase = downloads[idx].filePath.replace(/.[^.]+$/, "");
+            const videoBase = downloads[idx].filePath.replace(/\.[^.]+$/, "");
+            const langCounter = {};
             const subPromises = downloads[idx].subtitles.map(
-              ({ url, lang }) => {
+              ({ url, lang, file_id }) => {
                 const subExt = url.toLowerCase().includes(".srt")
                   ? ".srt"
                   : ".vtt";
@@ -963,9 +976,18 @@ ipcMain.handle(
                   /[^a-z0-9_-]/gi,
                   "",
                 );
-                const subDestPath = `${videoBase}.${safeLang}${subExt}`;
+                const lIdx = langCounter[safeLang] ?? 0;
+                langCounter[safeLang] = lIdx + 1;
+                const suffix = lIdx > 0 ? `.${lIdx}` : "";
+                const subDestPath = `${videoBase}.${safeLang}${suffix}${subExt}`;
                 return downloadSubtitleFile(url, subDestPath).then((ok) =>
-                  ok ? { lang: lang || "unknown", path: subDestPath } : null,
+                  ok
+                    ? {
+                        lang: lang || "unknown",
+                        path: subDestPath,
+                        file_id: file_id || null,
+                      }
+                    : null,
                 );
               },
             );
@@ -974,6 +996,10 @@ ipcMain.handle(
               if (i2 !== -1) {
                 downloads[i2].subtitlePaths = results.filter(Boolean);
                 saveDownloads();
+                sendProgress({
+                  id,
+                  subtitlePaths: downloads[i2].subtitlePaths,
+                });
               }
             });
           }
@@ -1520,6 +1546,7 @@ ipcMain.handle(
       const dir = path.dirname(filePath);
       const baseName = path.basename(filePath, path.extname(filePath));
       const results = [];
+      const langCounter = {};
 
       for (const sub of selectedSubs) {
         try {
@@ -1565,9 +1592,14 @@ ipcMain.handle(
               : "srt";
           }
 
-          const destPath = path.join(dir, `${baseName}.${langCode}.${ext}`);
+          const lIdx = langCounter[langCode] ?? 0;
+          langCounter[langCode] = lIdx + 1;
+          const suffix = lIdx > 0 ? `.${lIdx}` : "";
+          const destPath = path.join(
+            dir,
+            `${baseName}.${langCode}${suffix}.${ext}`,
+          );
           fs.writeFileSync(destPath, fileData);
-          // Store rich metadata so the UI can display and manage each subtitle
           results.push({
             lang: langCode,
             path: destPath,
@@ -1585,10 +1617,14 @@ ipcMain.handle(
         const idx = downloads.findIndex((d) => d.filePath === filePath);
         if (idx >= 0) {
           const existing = downloads[idx].subtitlePaths || [];
-          const existingLangs = new Set(existing.map((s) => s.lang));
+          const existingFileIds = new Set(
+            existing.map((s) => s.file_id).filter(Boolean),
+          );
           downloads[idx].subtitlePaths = [
             ...existing,
-            ...results.filter((r) => !existingLangs.has(r.lang)),
+            ...results.filter(
+              (r) => !r.file_id || !existingFileIds.has(r.file_id),
+            ),
           ];
           saveDownloads();
         }

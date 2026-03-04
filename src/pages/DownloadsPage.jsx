@@ -166,13 +166,17 @@ export default function DownloadsPage({
           dl={subtitleModalDl}
           onClose={() => setSubtitleModalDl(null)}
           onSubtitlesSaved={(newPaths) => {
+            const existing = subtitleModalDl.subtitlePaths || [];
+            const existingIds = new Set(
+              existing.map((e) => e.file_id).filter(Boolean),
+            );
+            const existingLangsSet = new Set(existing.map((e) => e.lang));
             const updated = [
-              ...(subtitleModalDl.subtitlePaths || []),
-              ...newPaths.filter(
-                (np) =>
-                  !(subtitleModalDl.subtitlePaths || []).some(
-                    (e) => e.lang === np.lang,
-                  ),
+              ...existing,
+              ...newPaths.filter((np) =>
+                np.file_id
+                  ? !existingIds.has(np.file_id)
+                  : !existingLangsSet.has(np.lang),
               ),
             ];
             onUpdateDownload?.(subtitleModalDl.id, { subtitlePaths: updated });
@@ -744,6 +748,9 @@ function SubtitleDownloaderModal({
   const [deletingPath, setDeletingPath] = useState(null); // path currently being deleted
 
   const existingSubs = dl.subtitlePaths || [];
+  const existingFileIds = new Set(
+    existingSubs.map((s) => s.file_id).filter(Boolean),
+  );
   const existingLangs = new Set(existingSubs.map((s) => s.lang));
 
   const doSearch = useCallback(
@@ -1109,9 +1116,12 @@ function SubtitleDownloaderModal({
               const isSelected = selectedSubs.some(
                 (s) => s.file_id === r.file_id,
               );
-              const alreadyHave = existingLangs.has(
-                (r.language || "").replace(/[^a-z0-9_-]/gi, "").toLowerCase(),
-              );
+              const rLang = (r.language || "")
+                .replace(/[^a-z0-9_-]/gi, "")
+                .toLowerCase();
+              const alreadyHave = r.file_id
+                ? existingFileIds.has(r.file_id)
+                : existingLangs.has(rLang);
               return (
                 <div
                   key={r.file_id}

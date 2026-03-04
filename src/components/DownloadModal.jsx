@@ -498,10 +498,12 @@ export default function DownloadModal({
             if (urlRes.ok) url = urlRes.url;
           }
           if (url) {
-            resolvedSubs = [
-              ...resolvedSubs.filter((s) => s.lang !== sub.language),
-              { url, lang: sub.language, name: sub.release || sub.file_name },
-            ];
+            resolvedSubs.push({
+              url,
+              lang: sub.language,
+              name: sub.release || sub.file_name,
+              file_id: sub.file_id || null,
+            });
           }
         } catch {}
       }
