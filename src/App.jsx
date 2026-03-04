@@ -645,7 +645,7 @@ export default function App() {
           <div
             style={{
               position: "fixed",
-              top: 0,
+              top: isWindows ? 32 : 0,
               left: 0,
               right: 0,
               zIndex: 9999,
