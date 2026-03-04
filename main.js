@@ -1495,20 +1495,36 @@ function writeSecretMigration() {
 function applySecretMigrationIfNeeded() {
   const mf = migrationFile();
   if (!fs.existsSync(mf)) return;
+  let plain = null;
   try {
-    const plain = JSON.parse(fs.readFileSync(mf, "utf8"));
-    for (const [k, v] of Object.entries(plain)) {
-      if (v) secureStoreSet(k, v);
-    }
-  } catch {
-    /* ignore parse/decrypt errors */
-  } finally {
-    // Always delete
+    const raw = fs.readFileSync(mf, "utf8");
+    // Delete IMMEDIATELY after reading. Don't wait for anything
     try {
       fs.unlinkSync(mf);
+    } catch (e) {
+      // If we can't delete, zero-out the file so secrets aren't readable
+      try {
+        fs.writeFileSync(mf, "{}", { mode: 0o600 });
+      } catch {}
+    }
+    plain = JSON.parse(raw);
+  } catch {
+    return;
+  }
+  if (!plain) return;
+  for (const [k, v] of Object.entries(plain)) {
+    try {
+      if (v) secureStoreSet(k, v);
     } catch {}
   }
 }
+
+// Safety-net: if migration file somehow survived, nuke it on quit
+app.on("quit", () => {
+  try {
+    fs.unlinkSync(migrationFile());
+  } catch {}
+});
 
 // ── IPC: Secure key store (safeStorage) ───────────────────────────────────────
 ipcMain.handle("secure-store-get", (_, key) => {
