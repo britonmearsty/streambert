@@ -3,14 +3,6 @@
 
 export const GITHUB_REPO = "truelockmc/streambert";
 
-// Dynamically fetched from Electron on first use
-export let APP_VERSION = "0.0.0";
-if (typeof window !== "undefined" && window.electron?.getAppVersion) {
-  window.electron.getAppVersion().then((v) => {
-    APP_VERSION = v;
-  });
-}
-
 // Normalise "1.3" → "1.3.0" so semver comparison works correctly
 export function normaliseVersion(v) {
   const parts = String(v).replace(/^v/i, "").split(".");
@@ -27,7 +19,17 @@ export function semverGt(a, b) {
   return false;
 }
 
+// Fetch current app version fresh each time, avoids race condition
+async function getCurrentVersion() {
+  if (typeof window !== "undefined" && window.electron?.getAppVersion) {
+    return window.electron.getAppVersion();
+  }
+  return "0.0.0";
+}
+
 export async function checkForUpdates() {
+  const currentVersion = await getCurrentVersion();
+
   const res = await fetch(
     `https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=10`,
     {
@@ -46,7 +48,7 @@ export async function checkForUpdates() {
 
   const latestRaw = (data.tag_name || "").replace(/^v/i, "");
   const latestParts = normaliseVersion(latestRaw);
-  const currentParts = normaliseVersion(APP_VERSION);
+  const currentParts = normaliseVersion(currentVersion);
   const url =
     data.html_url || `https://github.com/${GITHUB_REPO}/releases/latest`;
 
@@ -58,11 +60,12 @@ export async function checkForUpdates() {
       assets.appimage = asset.browser_download_url;
     else if (name.endsWith(".deb")) assets.deb = asset.browser_download_url;
     else if (name.endsWith(".exe")) assets.exe = asset.browser_download_url;
+    else if (name.endsWith(".dmg")) assets.dmg = asset.browser_download_url;
   }
 
   return {
-    latest: latestRaw || APP_VERSION,
-    current: APP_VERSION,
+    latest: latestRaw || currentVersion,
+    current: currentVersion,
     url,
     changelog: data.body || "",
     assets,
