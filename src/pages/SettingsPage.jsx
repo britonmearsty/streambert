@@ -1,131 +1,21 @@
 import { useState, useEffect, useRef } from "react";
 import UpdateModal from "../components/UpdateModal";
-import { storage, STORAGE_KEYS, secureStorage } from "../utils/storage";
+import {
+  storage,
+  STORAGE_KEYS,
+  secureStorage,
+  isElectron,
+} from "../utils/storage";
 import { SUBTITLE_LANGUAGES } from "../utils/subtitles";
 import { DEFAULT_INVIDIOUS_BASE } from "../components/TrailerModal";
 import { RATING_COUNTRIES } from "../utils/ageRating";
 import { WarningIcon } from "../components/Icons";
-
-// Dynamically fetched from Electron (package.json → app.getVersion())
-// Falls back to a placeholder until the async call resolves.
-export let APP_VERSION = "0.0.0";
-if (window.electron?.getAppVersion) {
-  window.electron.getAppVersion().then((v) => {
-    APP_VERSION = v;
-  });
-}
-const GITHUB_REPO = "truelockmc/streambert";
-
-// Normalise "1.3" → "1.3.0" so "1.3.0" === "1.3" after normalisation
-function normaliseVersion(v) {
-  const parts = String(v).replace(/^v/i, "").split(".");
-  while (parts.length < 3) parts.push("0");
-  return parts.slice(0, 3).map(Number);
-}
-
-// Returns true only when `a` is strictly greater than `b` (semver)
-function semverGt(a, b) {
-  for (let i = 0; i < 3; i++) {
-    if (a[i] > b[i]) return true;
-    if (a[i] < b[i]) return false;
-  }
-  return false; // equal
-}
-
-export async function checkForUpdates() {
-  const res = await fetch(
-    `https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=10`,
-    {
-      headers: { Accept: "application/vnd.github+json" },
-      signal: AbortSignal.timeout(8000),
-    },
-  );
-  if (!res.ok) throw new Error(`GitHub API error ${res.status}`);
-  const releases = await res.json();
-  // Skip pre-releases and drafts, only consider stable, published releases
-  const data = Array.isArray(releases)
-    ? releases.find((r) => !r.prerelease && !r.draft)
-    : null;
-  if (!data) throw new Error("No stable release found");
-  const latestRaw = (data.tag_name || "").replace(/^v/i, "");
-  const latestParts = normaliseVersion(latestRaw);
-  const currentParts = normaliseVersion(APP_VERSION);
-  const url =
-    data.html_url || `https://github.com/${GITHUB_REPO}/releases/latest`;
-
-  // Map release assets to install formats
-  const assets = {};
-  for (const asset of data.assets || []) {
-    const name = asset.name.toLowerCase();
-    if (name.endsWith(".appimage"))
-      assets.appimage = asset.browser_download_url;
-    else if (name.endsWith(".deb")) assets.deb = asset.browser_download_url;
-    else if (name.endsWith(".exe")) assets.exe = asset.browser_download_url;
-  }
-
-  return {
-    latest: latestRaw || APP_VERSION,
-    current: APP_VERSION,
-    url,
-    changelog: data.body || "",
-    assets,
-    hasUpdate: latestRaw !== "" && semverGt(latestParts, currentParts),
-  };
-}
-
-// ── Home row config ───────────────────────────────────────────────────────────
-export const HOME_ROWS = [
-  { id: "continue", label: "Continue Watching" },
-  { id: "similar", label: "Similar to…" },
-  { id: "trendingMovies", label: "Trending Movies" },
-  { id: "trendingTV", label: "Trending Series" },
-  { id: "topRated", label: "Top Rated" },
-];
-
-const DEFAULT_ROW_ORDER = HOME_ROWS.map((r) => r.id);
-const DEFAULT_ROW_VISIBLE = Object.fromEntries(
-  HOME_ROWS.map((r) => [r.id, true]),
-);
-
-export function loadHomeLayout() {
-  const savedOrder = storage.get("homeRowOrder");
-  const savedVisible = storage.get("homeRowVisible");
-
-  // Merge saved order: keep existing order, append any new rows at the end
-  const knownIds = new Set(HOME_ROWS.map((r) => r.id));
-  const baseOrder = savedOrder
-    ? [
-        ...savedOrder.filter((id) => knownIds.has(id)), // keep valid saved entries
-        ...DEFAULT_ROW_ORDER.filter((id) => !savedOrder.includes(id)), // append new ones
-      ]
-    : DEFAULT_ROW_ORDER;
-
-  // Merge saved visible: keep saved values, default new keys to true
-  const baseVisible = savedVisible
-    ? {
-        ...DEFAULT_ROW_VISIBLE, // new keys default to true
-        ...savedVisible, // saved values take precedence
-      }
-    : DEFAULT_ROW_VISIBLE;
-
-  return { order: baseOrder, visible: baseVisible };
-}
-
-function saveHomeLayout(order, visible) {
-  storage.set("homeRowOrder", order);
-  storage.set("homeRowVisible", visible);
-}
+import { APP_VERSION as _APP_VERSION, checkForUpdates } from "../utils/updates";
+import { HOME_ROWS, loadHomeLayout, saveHomeLayout } from "../utils/homeLayout";
+import { collectBackupData, restoreBackupData } from "../utils/backup";
+import { formatBytes } from "../utils/storage";
 
 // ── Start page config ─────────────────────────────────────────────────────────
-const START_PAGE_OPTIONS = [
-  { value: "home", label: "🏠  Home" },
-  { value: "history", label: "🕐  Library / History" },
-  { value: "downloads", label: "⬇  Downloads" },
-];
-
-export function loadStartPage() {
-  return storage.get("startPage") || "home";
-}
 
 // Age limit options: null = none, or specific ages
 const AGE_LIMIT_OPTIONS = [
@@ -339,6 +229,41 @@ function ConfirmDialog({
   );
 }
 
+// ── Toggle Switch ─────────────────────────────────────────────────────────────
+function Toggle({ value, onChange, title }) {
+  return (
+    <button
+      onClick={() => onChange(!value)}
+      title={title}
+      style={{
+        background: value ? "var(--red)" : "var(--surface2)",
+        border: "1px solid " + (value ? "var(--red)" : "var(--border)"),
+        borderRadius: 20,
+        width: 40,
+        height: 22,
+        cursor: "pointer",
+        position: "relative",
+        flexShrink: 0,
+        transition: "background 0.2s, border-color 0.2s",
+      }}
+    >
+      <span
+        style={{
+          position: "absolute",
+          top: 2,
+          left: value ? 20 : 2,
+          width: 16,
+          height: 16,
+          background: "#fff",
+          borderRadius: "50%",
+          transition: "left 0.2s",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+        }}
+      />
+    </button>
+  );
+}
+
 // ── Status Badge ──────────────────────────────────────────────────────────────
 function StatusBadge({ status }) {
   if (!status) return null;
@@ -460,33 +385,21 @@ function CleanRow({
   );
 }
 
-function formatBytes(bytes) {
-  if (bytes === null || bytes === undefined) return "…";
-  if (bytes === -1) return null; // unavailable, show nothing
-  if (bytes === 0) return "0 B";
-  if (bytes < 1024) return bytes + " B";
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
-  if (bytes < 1024 * 1024 * 1024)
-    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
-  return (bytes / (1024 * 1024 * 1024)).toFixed(2) + " GB";
-}
-
 // ── Version & Update Section ──────────────────────────────────────────────────
 function VersionSection() {
   const [checking, setChecking] = useState(false);
   const [result, setResult] = useState(null); // { latest, current, url, hasUpdate } | { error }
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [autoCheck, setAutoCheck] = useState(() => {
-    const stored = storage.get("autoCheckUpdates");
+    const stored = storage.get(STORAGE_KEYS.AUTO_CHECK_UPDATES);
     return stored === null || stored === undefined ? true : !!stored;
   });
   const [autoSaved, setAutoSaved] = useState(false);
-  const [currentVersion, setCurrentVersion] = useState(APP_VERSION);
+  const [currentVersion, setCurrentVersion] = useState(_APP_VERSION);
 
   useEffect(() => {
     if (window.electron?.getAppVersion) {
       window.electron.getAppVersion().then((v) => {
-        APP_VERSION = v;
         setCurrentVersion(v);
       });
     }
@@ -507,7 +420,7 @@ function VersionSection() {
 
   const toggleAuto = (val) => {
     setAutoCheck(val);
-    storage.set("autoCheckUpdates", val ? 1 : 0);
+    storage.set(STORAGE_KEYS.AUTO_CHECK_UPDATES, val ? 1 : 0);
     setAutoSaved(true);
     setTimeout(() => setAutoSaved(false), 1800);
   };
@@ -611,35 +524,11 @@ function VersionSection() {
           flexWrap: "wrap",
         }}
       >
-        <button
-          onClick={() => toggleAuto(!autoCheck)}
-          style={{
-            background: autoCheck ? "var(--red)" : "var(--surface2)",
-            border: "1px solid " + (autoCheck ? "var(--red)" : "var(--border)"),
-            borderRadius: 20,
-            width: 40,
-            height: 22,
-            cursor: "pointer",
-            position: "relative",
-            flexShrink: 0,
-            transition: "background 0.2s, border-color 0.2s",
-          }}
+        <Toggle
+          value={autoCheck}
+          onChange={toggleAuto}
           title={autoCheck ? "Disable auto-check" : "Enable auto-check"}
-        >
-          <span
-            style={{
-              position: "absolute",
-              top: 2,
-              left: autoCheck ? 20 : 2,
-              width: 16,
-              height: 16,
-              background: "#fff",
-              borderRadius: "50%",
-              transition: "left 0.2s",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
-            }}
-          />
-        </button>
+        />
         <div>
           <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text)" }}>
             Check for updates on startup
@@ -691,8 +580,8 @@ function HomeLayoutSection() {
   };
 
   const handleSave = () => {
-    storage.set("homeRowOrder", order);
-    storage.set("homeRowVisible", visible);
+    storage.set(STORAGE_KEYS.HOME_ROW_ORDER, order);
+    storage.set(STORAGE_KEYS.HOME_ROW_VISIBLE, visible);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -769,36 +658,11 @@ function HomeLayoutSection() {
             </span>
 
             {/* Toggle */}
-            <button
-              onClick={() => toggleVisible(id)}
-              style={{
-                background: visible[id] ? "var(--red)" : "var(--surface2)",
-                border:
-                  "1px solid " + (visible[id] ? "var(--red)" : "var(--border)"),
-                borderRadius: 20,
-                width: 40,
-                height: 22,
-                cursor: "pointer",
-                position: "relative",
-                flexShrink: 0,
-                transition: "background 0.2s, border-color 0.2s",
-              }}
+            <Toggle
+              value={visible[id]}
+              onChange={() => toggleVisible(id)}
               title={visible[id] ? "Hide row" : "Show row"}
-            >
-              <span
-                style={{
-                  position: "absolute",
-                  top: 2,
-                  left: visible[id] ? 20 : 2,
-                  width: 16,
-                  height: 16,
-                  background: "#fff",
-                  borderRadius: "50%",
-                  transition: "left 0.2s",
-                  boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
-                }}
-              />
-            </button>
+            />
           </div>
         ))}
       </div>
@@ -822,6 +686,212 @@ function HomeLayoutSection() {
   );
 }
 
+// ── Scheduled Backup Section ──────────────────────────────────────────────────
+const FREQUENCY_OPTIONS = [
+  { value: "startup", label: "On App Start" },
+  { value: "daily", label: "Daily" },
+  { value: "weekly", label: "Weekly" },
+  { value: "monthly", label: "Monthly" },
+];
+
+function ScheduledBackupSection() {
+  const [enabled, setEnabled] = useState(false);
+  const [backupPath, setBackupPath] = useState("");
+  const [keepCount, setKeepCount] = useState(5);
+  const [frequency, setFrequency] = useState("startup");
+  const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!isElectron) {
+      setLoading(false);
+      return;
+    }
+    window.electron.getScheduledBackupSettings().then((s) => {
+      if (s) {
+        setEnabled(!!s.enabled);
+        setBackupPath(s.path || "");
+        setKeepCount(s.keepCount ?? 5);
+        setFrequency(s.frequency || "startup");
+      }
+      setLoading(false);
+    });
+  }, []);
+
+  const pickFolder = async () => {
+    if (!isElectron) return;
+    const folder = await window.electron.pickFolder();
+    if (folder) setBackupPath(folder);
+  };
+
+  const handleSave = async () => {
+    if (!isElectron) return;
+    const settings = {
+      enabled,
+      path: backupPath,
+      keepCount: Math.max(1, Math.min(99, Number(keepCount) || 5)),
+      frequency,
+      lastRun: null,
+    };
+    // preserve lastRun from existing settings
+    const existing = await window.electron.getScheduledBackupSettings();
+    if (existing?.lastRun) settings.lastRun = existing.lastRun;
+    await window.electron.setScheduledBackupSettings(settings);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  if (!isElectron || loading) return null;
+
+  return (
+    <div
+      style={{
+        marginTop: 28,
+        padding: "20px 22px",
+        background: "var(--surface2)",
+        border: "1px solid var(--border)",
+        borderRadius: 10,
+      }}
+    >
+      {/* Header row with toggle */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          marginBottom: enabled ? 20 : 0,
+        }}
+      >
+        <Toggle value={enabled} onChange={setEnabled} />
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>
+            Scheduled Backups
+          </div>
+          <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 2 }}>
+            Automatically save a backup file on a schedule
+          </div>
+        </div>
+      </div>
+
+      {enabled && (
+        <>
+          {/* Backup path */}
+          <div style={{ marginBottom: 14 }}>
+            <div
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: "var(--text2)",
+                marginBottom: 6,
+              }}
+            >
+              Backup Folder
+            </div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input
+                className="apikey-input"
+                style={{ flex: 1, marginBottom: 0 }}
+                placeholder="/home/you/Backups"
+                value={backupPath}
+                onChange={(e) => setBackupPath(e.target.value)}
+              />
+              <button
+                className="btn btn-ghost"
+                style={{ padding: "7px 14px", fontSize: 13 }}
+                onClick={pickFolder}
+              >
+                Browse…
+              </button>
+            </div>
+          </div>
+
+          {/* Frequency + Keep count row */}
+          <div
+            style={{
+              display: "flex",
+              gap: 16,
+              flexWrap: "wrap",
+              marginBottom: 16,
+            }}
+          >
+            <div style={{ flex: 1, minWidth: 160 }}>
+              <div
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: "var(--text2)",
+                  marginBottom: 6,
+                }}
+              >
+                Frequency
+              </div>
+              <select
+                value={frequency}
+                onChange={(e) => setFrequency(e.target.value)}
+                style={{
+                  width: "100%",
+                  background: "var(--surface)",
+                  color: "var(--text)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 7,
+                  padding: "8px 12px",
+                  fontSize: 13,
+                  cursor: "pointer",
+                }}
+              >
+                {FREQUENCY_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ flex: 1, minWidth: 120 }}>
+              <div
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: "var(--text2)",
+                  marginBottom: 6,
+                }}
+              >
+                Keep Last N Backups
+              </div>
+              <input
+                type="number"
+                min={1}
+                max={99}
+                className="apikey-input"
+                style={{ width: "100%", marginBottom: 0 }}
+                value={keepCount}
+                onChange={(e) => setKeepCount(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <button className="btn btn-primary" onClick={handleSave}>
+              Save
+            </button>
+            {saved && (
+              <span style={{ fontSize: 13, color: "#48c774" }}>✓ Saved</span>
+            )}
+          </div>
+        </>
+      )}
+
+      {!enabled && (
+        <div
+          style={{ display: "flex", justifyContent: "flex-end", marginTop: 0 }}
+        >
+          {/* empty, toggle handles everything */}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Backup & Restore ─────────────────────────────────────────────────────────
 function BackupRestoreSection({ onRestored }) {
   const [restoreStatus, setRestoreStatus] = useState(null);
@@ -830,63 +900,8 @@ function BackupRestoreSection({ onRestored }) {
     const backup = {
       version: 1,
       exportedAt: new Date().toISOString(),
-      data: {
-        saved: JSON.parse(localStorage.getItem("streambert_saved") || "null"),
-        savedOrder: JSON.parse(
-          localStorage.getItem("streambert_savedOrder") || "null",
-        ),
-        history: JSON.parse(
-          localStorage.getItem("streambert_history") || "null",
-        ),
-        progress: JSON.parse(
-          localStorage.getItem("streambert_progress") || "null",
-        ),
-        watched: JSON.parse(
-          localStorage.getItem("streambert_watched") || "null",
-        ),
-        // Settings
-        homeRowOrder: JSON.parse(
-          localStorage.getItem("streambert_homeRowOrder") || "null",
-        ),
-        homeRowVisible: JSON.parse(
-          localStorage.getItem("streambert_homeRowVisible") || "null",
-        ),
-        startPage: JSON.parse(
-          localStorage.getItem("streambert_startPage") || "null",
-        ),
-        ageLimit: JSON.parse(
-          localStorage.getItem("streambert_ageLimit") || "null",
-        ),
-        ratingCountry: JSON.parse(
-          localStorage.getItem("streambert_ratingCountry") || "null",
-        ),
-        watchedThreshold: JSON.parse(
-          localStorage.getItem("streambert_watchedThreshold") || "null",
-        ),
-        subtitleDownload: JSON.parse(
-          localStorage.getItem("streambert_subtitleDownload") || "null",
-        ),
-        subtitleLang: JSON.parse(
-          localStorage.getItem("streambert_subtitleLang") || "null",
-        ),
-        invidiousBase: JSON.parse(
-          localStorage.getItem("streambert_invidiousBase") || "null",
-        ),
-        autoCheckUpdates: JSON.parse(
-          localStorage.getItem("streambert_autoCheckUpdates") || "null",
-        ),
-        playerSource: JSON.parse(
-          localStorage.getItem("streambert_playerSource") || "null",
-        ),
-        downloadPath: JSON.parse(
-          localStorage.getItem("streambert_downloadPath") || "null",
-        ),
-      },
+      data: collectBackupData(),
     };
-    // Remove null fields to keep export clean
-    for (const k of Object.keys(backup.data)) {
-      if (backup.data[k] === null) delete backup.data[k];
-    }
     const blob = new Blob([JSON.stringify(backup, null, 2)], {
       type: "application/json",
     });
@@ -907,31 +922,7 @@ function BackupRestoreSection({ onRestored }) {
         const backup = JSON.parse(ev.target.result);
         if (!backup?.data)
           throw new Error("Invalid backup file, missing data field.");
-        const { data } = backup;
-        const keyMap = {
-          saved: "streambert_saved",
-          savedOrder: "streambert_savedOrder",
-          history: "streambert_history",
-          progress: "streambert_progress",
-          watched: "streambert_watched",
-          homeRowOrder: "streambert_homeRowOrder",
-          homeRowVisible: "streambert_homeRowVisible",
-          startPage: "streambert_startPage",
-          ageLimit: "streambert_ageLimit",
-          ratingCountry: "streambert_ratingCountry",
-          watchedThreshold: "streambert_watchedThreshold",
-          subtitleDownload: "streambert_subtitleDownload",
-          subtitleLang: "streambert_subtitleLang",
-          invidiousBase: "streambert_invidiousBase",
-          autoCheckUpdates: "streambert_autoCheckUpdates",
-          playerSource: "streambert_playerSource",
-          downloadPath: "streambert_downloadPath",
-        };
-        for (const [k, lsKey] of Object.entries(keyMap)) {
-          if (data[k] !== undefined && data[k] !== null) {
-            localStorage.setItem(lsKey, JSON.stringify(data[k]));
-          }
-        }
+        restoreBackupData(backup.data);
         setRestoreStatus("✓ Backup restored: reloading…");
         setTimeout(() => window.location.reload(), 1200);
         onRestored?.();
@@ -969,7 +960,7 @@ function BackupRestoreSection({ onRestored }) {
         }}
       >
         <button className="btn btn-primary" onClick={handleExport}>
-          ⬇ Export Backup
+          ⬆ Export Backup
         </button>
         <label
           style={{
@@ -993,7 +984,7 @@ function BackupRestoreSection({ onRestored }) {
             (e.currentTarget.style.background = "var(--surface2)")
           }
         >
-          ⬆ Import Backup
+          ⬇ Import Backup
           <input
             type="file"
             accept=".json,application/json"
@@ -1013,6 +1004,7 @@ function BackupRestoreSection({ onRestored }) {
           </span>
         )}
       </div>
+      <ScheduledBackupSection />
     </div>
   );
 }
@@ -1020,12 +1012,12 @@ function BackupRestoreSection({ onRestored }) {
 // ── Start Page Section ────────────────────────────────────────────────────────
 function StartPageSection() {
   const [startPage, setStartPage] = useState(
-    () => storage.get("startPage") || "home",
+    () => storage.get(STORAGE_KEYS.START_PAGE) || "home",
   );
   const [saved, setSaved] = useState(false);
 
   const handleSave = () => {
-    storage.set("startPage", startPage);
+    storage.set(STORAGE_KEYS.START_PAGE, startPage);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -1176,33 +1168,7 @@ function SubtitleSettingsSection() {
           marginBottom: 20,
         }}
       >
-        <button
-          onClick={() => setEnabled((v) => !v)}
-          style={{
-            width: 40,
-            height: 22,
-            borderRadius: 11,
-            border: "none",
-            cursor: "pointer",
-            background: enabled ? "var(--red)" : "var(--surface2)",
-            position: "relative",
-            transition: "background 0.2s",
-            flexShrink: 0,
-          }}
-        >
-          <span
-            style={{
-              position: "absolute",
-              top: 3,
-              left: enabled ? 21 : 3,
-              width: 16,
-              height: 16,
-              borderRadius: "50%",
-              background: "#fff",
-              transition: "left 0.2s",
-            }}
-          />
-        </button>
+        <Toggle value={enabled} onChange={setEnabled} />
         <span
           style={{
             fontSize: 14,
@@ -1344,10 +1310,10 @@ function SubtitleSettingsSection() {
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function SettingsPage({ apiKey, onChangeApiKey }) {
   const [downloadPath, setDownloadPath] = useState(
-    () => storage.get("downloadPath") || "",
+    () => storage.get(STORAGE_KEYS.DOWNLOAD_PATH) || "",
   );
   const [watchedThreshold, setWatchedThreshold] = useState(
-    () => storage.get("watchedThreshold") ?? 20,
+    () => storage.get(STORAGE_KEYS.WATCHED_THRESHOLD) ?? 20,
   );
   const [saved, setSaved] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -1357,20 +1323,20 @@ export default function SettingsPage({ apiKey, onChangeApiKey }) {
 
   // Age Rating
   const [ratingCountry, setRatingCountry] = useState(
-    () => storage.get("ratingCountry") || "US",
+    () => storage.get(STORAGE_KEYS.RATING_COUNTRY) || "US",
   );
   const [ageLimit, setAgeLimit] = useState(() => {
-    const v = storage.get("ageLimit");
+    const v = storage.get(STORAGE_KEYS.AGE_LIMIT);
     return v === null || v === undefined ? "" : String(v);
   });
   const [ageSaved, setAgeSaved] = useState(false);
 
   const saveAgeSettings = () => {
-    storage.set("ratingCountry", ratingCountry);
+    storage.set(STORAGE_KEYS.RATING_COUNTRY, ratingCountry);
     if (ageLimit === "" || ageLimit === null) {
-      storage.remove("ageLimit");
+      storage.remove(STORAGE_KEYS.AGE_LIMIT);
     } else {
-      storage.set("ageLimit", Number(ageLimit));
+      storage.set(STORAGE_KEYS.AGE_LIMIT, Number(ageLimit));
     }
     setAgeSaved(true);
     setTimeout(() => setAgeSaved(false), 2000);
@@ -1378,7 +1344,7 @@ export default function SettingsPage({ apiKey, onChangeApiKey }) {
 
   // Invidious
   const [invidiousBase, setInvidiousBase] = useState(
-    () => storage.get("invidiousBase") || DEFAULT_INVIDIOUS_BASE,
+    () => storage.get(STORAGE_KEYS.INVIDIOUS_BASE) || DEFAULT_INVIDIOUS_BASE,
   );
   const [invidiousStatus, setInvidiousStatus] = useState(null); // null | { ok: bool, msg: string }
   const [invidiousChecking, setInvidiousChecking] = useState(false);
@@ -1418,7 +1384,7 @@ export default function SettingsPage({ apiKey, onChangeApiKey }) {
 
   const saveInvidiousBase = () => {
     const clean = (invidiousBase || "").trim().replace(/\/$/, "");
-    storage.set("invidiousBase", clean || DEFAULT_INVIDIOUS_BASE);
+    storage.set(STORAGE_KEYS.INVIDIOUS_BASE, clean || DEFAULT_INVIDIOUS_BASE);
     setInvidiousBase(clean || DEFAULT_INVIDIOUS_BASE);
     setInvidiousSaved(true);
     setTimeout(() => setInvidiousSaved(false), 2000);
@@ -1448,27 +1414,25 @@ export default function SettingsPage({ apiKey, onChangeApiKey }) {
     })();
   }, []);
 
-  const isElectron = typeof window !== "undefined" && !!window.electron;
-
   const pickFolder = async () => {
     if (!isElectron) return;
     const folder = await window.electron.pickFolder();
     if (folder) {
       setDownloadPath(folder);
-      storage.set("downloadPath", folder);
+      storage.set(STORAGE_KEYS.DOWNLOAD_PATH, folder);
       flash();
     }
   };
 
   const handleSavePath = () => {
-    storage.set("downloadPath", downloadPath);
+    storage.set(STORAGE_KEYS.DOWNLOAD_PATH, downloadPath);
     flash();
   };
 
   const handleSaveThreshold = () => {
     const val = Math.max(1, Math.min(300, Number(watchedThreshold) || 20));
     setWatchedThreshold(val);
-    storage.set("watchedThreshold", val);
+    storage.set(STORAGE_KEYS.WATCHED_THRESHOLD, val);
     flash();
   };
 
@@ -1486,9 +1450,9 @@ export default function SettingsPage({ apiKey, onChangeApiKey }) {
   };
 
   const handleClearWatchProgress = async () => {
-    storage.remove("progress");
-    storage.remove("history");
-    storage.remove("watched");
+    storage.remove(STORAGE_KEYS.WATCH_PROGRESS);
+    storage.remove(STORAGE_KEYS.HISTORY);
+    storage.remove(STORAGE_KEYS.WATCHED);
     if (isElectron) await window.electron.clearWatchData();
     setTimeout(() => window.location.reload(), 800);
     return { msg: "✓ Watch data cleared" };
@@ -1504,7 +1468,7 @@ export default function SettingsPage({ apiKey, onChangeApiKey }) {
         if (res.errors > 0) msg += ` (${res.errors} could not be deleted)`;
       }
     } else {
-      storage.remove("localFiles");
+      storage.remove(STORAGE_KEYS.LOCAL_FILES);
     }
     return { msg };
   };

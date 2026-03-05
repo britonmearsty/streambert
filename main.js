@@ -14,6 +14,46 @@ const https = require("https");
 const http = require("http");
 const os = require("os");
 
+// ── Scheduled backup store ────────────────────────────────────────────────────
+const scheduledBackupSettingsFile = () =>
+  path.join(app.getPath("userData"), "scheduled-backup-settings.json");
+
+function loadScheduledBackupSettings() {
+  try {
+    const raw = fs.readFileSync(scheduledBackupSettingsFile(), "utf8");
+    return JSON.parse(raw);
+  } catch {
+    return {
+      enabled: false,
+      path: "",
+      keepCount: 5,
+      frequency: "startup",
+      lastRun: null,
+    };
+  }
+}
+
+function saveScheduledBackupSettings(settings) {
+  fs.writeFileSync(
+    scheduledBackupSettingsFile(),
+    JSON.stringify(settings, null, 2),
+    "utf8",
+  );
+}
+
+function shouldRunScheduledBackup(settings) {
+  if (!settings.enabled || !settings.path) return false;
+  if (settings.frequency === "startup") return true;
+  if (!settings.lastRun) return true;
+  const last = new Date(settings.lastRun).getTime();
+  const now = Date.now();
+  const diff = now - last;
+  if (settings.frequency === "daily") return diff >= 86400000;
+  if (settings.frequency === "weekly") return diff >= 604800000;
+  if (settings.frequency === "monthly") return diff >= 2592000000;
+  return false;
+}
+
 // ── Block stats store ─────────────────────────────────────────────────────────
 const blockStatsFile = () =>
   path.join(app.getPath("userData"), "blockStats.json");
@@ -498,6 +538,14 @@ function createWindow() {
   });
 
   mainWindow.loadFile(path.join(__dirname, "dist/index.html"));
+
+  // ── Scheduled backup: trigger renderer after load ──────────────────────────
+  mainWindow.webContents.once("did-finish-load", () => {
+    const sbSettings = loadScheduledBackupSettings();
+    if (shouldRunScheduledBackup(sbSettings)) {
+      mainWindow.webContents.send("scheduled-backup-requested");
+    }
+  });
 
   // Intercept close, ask user if downloads are running
   let closeResponsePending = false;
@@ -3025,4 +3073,69 @@ ipcMain.handle("download-and-install-update", async (_, { url, format }) => {
 
 ipcMain.handle("cancel-update", () => {
   _updateAbortController?.abort();
+});
+
+// ── Scheduled Backup IPC ──────────────────────────────────────────────────────
+
+ipcMain.handle("get-scheduled-backup-settings", () => {
+  return loadScheduledBackupSettings();
+});
+
+ipcMain.handle("set-scheduled-backup-settings", (_, settings) => {
+  try {
+    saveScheduledBackupSettings(settings);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+
+ipcMain.handle("perform-scheduled-backup", (_, { data, settings }) => {
+  try {
+    const backupDir = settings.path;
+    if (!backupDir) return { ok: false, error: "No backup path set" };
+
+    // Ensure directory exists
+    fs.mkdirSync(backupDir, { recursive: true });
+
+    // Write backup file
+    const timestamp = new Date()
+      .toISOString()
+      .replace(/[:.]/g, "-")
+      .slice(0, 19);
+    const filename = `streambert-backup-${timestamp}.json`;
+    const fullPath = path.join(backupDir, filename);
+    const backup = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      scheduledBackup: true,
+      data,
+    };
+    fs.writeFileSync(fullPath, JSON.stringify(backup, null, 2), "utf8");
+
+    // Prune old backups: keep only the N most recent
+    const keepCount = Math.max(1, Number(settings.keepCount) || 5);
+    const allFiles = fs
+      .readdirSync(backupDir)
+      .filter((f) => f.startsWith("streambert-backup-") && f.endsWith(".json"))
+      .map((f) => ({
+        name: f,
+        mtime: fs.statSync(path.join(backupDir, f)).mtimeMs,
+      }))
+      .sort((a, b) => b.mtime - a.mtime);
+
+    for (const file of allFiles.slice(keepCount)) {
+      try {
+        fs.unlinkSync(path.join(backupDir, file.name));
+      } catch {}
+    }
+
+    // Update lastRun timestamp
+    const updated = { ...settings, lastRun: new Date().toISOString() };
+    saveScheduledBackupSettings(updated);
+
+    return { ok: true, path: fullPath };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
 });

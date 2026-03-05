@@ -1,6 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { CloseIcon, DownloadIcon, SettingsIcon, SubtitlesIcon } from "./Icons";
-import { storage, STORAGE_KEYS, secureStorage } from "../utils/storage";
+import {
+  storage,
+  STORAGE_KEYS,
+  secureStorage,
+  isElectron,
+} from "../utils/storage";
 import {
   SUBTITLE_LANGUAGES,
   LANG_LABEL,
@@ -404,7 +409,6 @@ export default function DownloadModal({
   const [selectedSubs, setSelectedSubs] = useState([]);
   const [showBrowser, setShowBrowser] = useState(false);
 
-  const isElectron = typeof window !== "undefined" && !!window.electron;
   const canSearchOS = isElectron && !!tmdbId;
 
   const ua = navigator.userAgent.toLowerCase();

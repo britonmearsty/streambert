@@ -8,7 +8,12 @@ import {
   WatchedIcon,
   SubtitlesIcon,
 } from "../components/Icons";
-import { storage, STORAGE_KEYS, secureStorage } from "../utils/storage";
+import {
+  storage,
+  STORAGE_KEYS,
+  secureStorage,
+  isElectron,
+} from "../utils/storage";
 import { SUBTITLE_LANGUAGES } from "../utils/subtitles";
 import { imgUrl } from "../utils/api";
 
@@ -80,8 +85,6 @@ export default function DownloadsPage({
   );
   const highlightRef = useRef(null);
   const [subtitleModalDl, setSubtitleModalDl] = useState(null);
-
-  const isElectron = typeof window !== "undefined" && !!window.electron;
 
   const active = downloads.filter((d) => d.status === "downloading");
   const finished = downloads

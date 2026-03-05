@@ -31,8 +31,6 @@ export const storage = {
   },
 };
 
-export const getApiKey = () => storage.get(STORAGE_KEYS.API_KEY);
-
 // Centralised storage key registry
 export const STORAGE_KEYS = {
   API_KEY: "apikey",
@@ -57,9 +55,28 @@ export const STORAGE_KEYS = {
   // Subtitle settings
   SUBTITLE_ENABLED: "subtitleDownload",
   SUBTITLE_LANG: "subtitleLang",
-  // NOTE: SUBDL_API_KEY and API_KEY are stored encrypted via secureStorage (see below)
+  // NOTE: SUBDL_API_KEY and API_KEY are stored encrypted via secureStorage
   SUBDL_API_KEY: "subdlApiKey",
 };
+
+export const getApiKey = () => storage.get(STORAGE_KEYS.API_KEY);
+
+// ── Shared helpers ────────────────────────────────────────────────────────────
+
+/** True when running inside Electron (contextBridge exposed). */
+export const isElectron = typeof window !== "undefined" && !!window.electron;
+
+/** Format a byte count into a human-readable string. */
+export function formatBytes(bytes) {
+  if (bytes === null || bytes === undefined) return "…";
+  if (bytes === -1) return null; // unavailable
+  if (bytes === 0) return "0 B";
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+  if (bytes < 1024 * 1024 * 1024)
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  return (bytes / (1024 * 1024 * 1024)).toFixed(2) + " GB";
+}
 
 // ── Secure storage for sensitive keys ────────────────────────────────────────
 // Uses Electron safeStorage (OS keychain / DPAPI / libsecret).
@@ -69,19 +86,19 @@ export const STORAGE_KEYS = {
 //   "apikey"      – TMDB API key
 //   "subdlApiKey" – SubDL API key
 
-const isElectron =
+const _isElectronSecure =
   typeof window !== "undefined" && !!window.electron?.secureGet;
 
 export const secureStorage = {
   /** Read an encrypted value. Returns null if not set. */
   async get(key) {
-    if (!isElectron) return null;
+    if (!_isElectronSecure) return null;
     return window.electron.secureGet(key);
   },
 
   /** Write an encrypted value. Pass null/empty to delete. */
   async set(key, value) {
-    if (!isElectron) return;
+    if (!_isElectronSecure) return;
     return window.electron.secureSet(key, value ?? "");
   },
 };

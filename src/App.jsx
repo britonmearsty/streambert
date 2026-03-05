@@ -3,6 +3,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import KeyboardShortcutsModal from "./components/KeyboardShortcutsModal";
 import WindowTitlebar from "./components/WindowTitlebar";
 import { storage, secureStorage } from "./utils/storage";
+import { collectBackupData } from "./utils/backup";
 import { tmdbFetch, setApiErrorHandlers } from "./utils/api";
 
 import Sidebar from "./components/Sidebar";
@@ -15,7 +16,8 @@ import HomePage from "./pages/HomePage";
 import MoviePage from "./pages/MoviePage";
 import TVPage from "./pages/TVPage";
 import LibraryPage from "./pages/LibraryPage";
-import SettingsPage, { checkForUpdates } from "./pages/SettingsPage";
+import SettingsPage from "./pages/SettingsPage";
+import { checkForUpdates } from "./utils/updates";
 import DownloadsPage from "./pages/DownloadsPage";
 
 export default function App() {
@@ -49,6 +51,22 @@ export default function App() {
   const [trendingTV, setTrendingTV] = useState([]);
   const [loadingHome, setLoadingHome] = useState(false);
   const [offline, setOffline] = useState(() => !navigator.onLine);
+
+  // ── Scheduled backup: run on startup if due ─────────────────────────────────
+  useEffect(() => {
+    if (!window.electron?.onScheduledBackupRequested) return;
+    const handler = window.electron.onScheduledBackupRequested(async () => {
+      try {
+        const settings = await window.electron.getScheduledBackupSettings();
+        if (!settings?.enabled || !settings?.path) return;
+        const data = collectBackupData();
+        await window.electron.performScheduledBackup({ data, settings });
+      } catch {
+        // silently ignore errors on scheduled backup
+      }
+    });
+    return () => window.electron.offScheduledBackupRequested(handler);
+  }, []);
 
   // ── Startup update check ─────────────────────────────────────────────────
   useEffect(() => {

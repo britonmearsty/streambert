@@ -6,7 +6,7 @@ import { imgUrl, tmdbFetch } from "../utils/api";
 import { useRatings, getRatingForItem } from "../utils/useRatings";
 import { isRestricted } from "../utils/ageRating";
 import { storage } from "../utils/storage";
-import { loadHomeLayout } from "./SettingsPage";
+import { loadHomeLayout } from "../utils/homeLayout";
 
 function getRecentHistoryItem(history) {
   if (!history || history.length === 0) return null;

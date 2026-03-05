@@ -130,4 +130,18 @@ contextBridge.exposeInMainWorld("electron", {
     return h;
   },
   offUpdateProgress: (h) => ipcRenderer.removeListener("update-progress", h),
+  // Scheduled backups
+  getScheduledBackupSettings: () =>
+    ipcRenderer.invoke("get-scheduled-backup-settings"),
+  setScheduledBackupSettings: (settings) =>
+    ipcRenderer.invoke("set-scheduled-backup-settings", settings),
+  performScheduledBackup: (args) =>
+    ipcRenderer.invoke("perform-scheduled-backup", args),
+  onScheduledBackupRequested: (cb) => {
+    const h = () => cb();
+    ipcRenderer.on("scheduled-backup-requested", h);
+    return h;
+  },
+  offScheduledBackupRequested: (h) =>
+    ipcRenderer.removeListener("scheduled-backup-requested", h),
 });
