@@ -73,6 +73,15 @@ export const tmdbFetch = async (path, apiKey) => {
   if (!res.ok) throw new Error(`TMDB ${res.status}`);
   const data = await res.json();
   _tmdbCache.set(cacheKey, { data, expiresAt: Date.now() + TMDB_CACHE_TTL });
+
+  // Evict stale entries to prevent unbounded memory growth
+  if (_tmdbCache.size > 80) {
+    const now = Date.now();
+    for (const [k, v] of _tmdbCache) {
+      if (now >= v.expiresAt) _tmdbCache.delete(k);
+    }
+  }
+
   return data;
 };
 
@@ -222,10 +231,15 @@ function getAnilistCache() {
   return _anilistCache;
 }
 
+let _anilistFlushTimer = null;
 function flushAnilistCache() {
-  try {
-    localStorage.setItem(ANILIST_CACHE_KEY, JSON.stringify(_anilistCache));
-  } catch {}
+  if (_anilistFlushTimer) clearTimeout(_anilistFlushTimer);
+  _anilistFlushTimer = setTimeout(() => {
+    _anilistFlushTimer = null;
+    try {
+      localStorage.setItem(ANILIST_CACHE_KEY, JSON.stringify(_anilistCache));
+    } catch {}
+  }, 500);
 }
 
 // tmdbId is used as the cache key (unique per show) while title is used for the AniList search query.

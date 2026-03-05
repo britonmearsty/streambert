@@ -674,16 +674,17 @@ function register(getMainWindow) {
     }
   });
 
-  ipcMain.handle("get-downloads-size", () => {
+  ipcMain.handle("get-downloads-size", async () => {
     let bytes = 0;
-    for (const dl of downloads) {
-      if (dl.filePath) {
+    await Promise.all(
+      downloads.map(async (dl) => {
+        if (!dl.filePath) return;
         try {
-          const stat = fs.statSync(dl.filePath);
+          const stat = await fs.promises.stat(dl.filePath);
           if (stat.isFile()) bytes += stat.size;
         } catch {}
-      }
-    }
+      }),
+    );
     return { bytes };
   });
 

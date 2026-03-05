@@ -6,23 +6,34 @@ const PREFIX = "streambert_";
 
 // All localStorage keys (without prefix) that are included in backups
 export const BACKUP_KEYS = [
+  // Watch data
   "saved",
   "savedOrder",
   "history",
   "progress",
   "watched",
+  // UI / layout preferences
   "homeRowOrder",
   "homeRowVisible",
   "startPage",
+  // Player preferences
+  "playerSource",
+  "allmangaDubMode",
+  // Other Stuff
   "ageLimit",
   "ratingCountry",
   "watchedThreshold",
+  // Subtitles
   "subtitleDownload",
   "subtitleLang",
+  // Paths & folders
+  "downloadPath",
+  "downloaderFolder",
+  // Misc settings
   "invidiousBase",
   "autoCheckUpdates",
-  "playerSource",
-  "downloadPath",
+  // Search history
+  "searchHistory",
 ];
 
 /**
