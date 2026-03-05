@@ -7,7 +7,7 @@
     "email": "anonyson@proton.me"
   },
   "license": "GPL-3.0",
-  "main": "main.js",
+  "main": "index.js",
   "private": false,
   "scripts": {
     "dev": "vite build --watch",
