@@ -10,7 +10,7 @@ import { SUBTITLE_LANGUAGES } from "../utils/subtitles";
 import { DEFAULT_INVIDIOUS_BASE } from "../components/TrailerModal";
 import { RATING_COUNTRIES } from "../utils/ageRating";
 import { WarningIcon } from "../components/Icons";
-import { APP_VERSION as _APP_VERSION, checkForUpdates } from "../utils/updates";
+import { checkForUpdates } from "../utils/updates";
 import { HOME_ROWS, loadHomeLayout, saveHomeLayout } from "../utils/homeLayout";
 import { collectBackupData, restoreBackupData } from "../utils/backup";
 import { formatBytes } from "../utils/storage";
@@ -395,7 +395,7 @@ function VersionSection() {
     return stored === null || stored === undefined ? true : !!stored;
   });
   const [autoSaved, setAutoSaved] = useState(false);
-  const [currentVersion, setCurrentVersion] = useState(_APP_VERSION);
+  const [currentVersion, setCurrentVersion] = useState("0.0.0");
 
   useEffect(() => {
     if (window.electron?.getAppVersion) {
