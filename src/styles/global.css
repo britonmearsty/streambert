@@ -459,6 +459,31 @@ body,
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
 }
 
+body.compact-mode .cards-grid {
+    grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+    gap: 10px;
+}
+body.compact-mode .card-info {
+    padding: 6px 8px;
+}
+body.compact-mode .card-title {
+    font-size: 11px;
+}
+body.compact-mode .card-year {
+    font-size: 10px;
+}
+body.compact-mode .scroll-row .card {
+    width: 108px;
+}
+
+body.no-anim *,
+body.no-anim *::before,
+body.no-anim *::after {
+    transition-duration: 0.001ms !important;
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+}
+
 .card {
     cursor: pointer;
     border-radius: var(--radius);

@@ -34,6 +34,13 @@ export const BACKUP_KEYS = [
   "autoCheckUpdates",
   // Search history
   "searchHistory",
+  // Appearance & behaviour
+  "accentColor",
+  "fontSize",
+  "compactMode",
+  "reduceAnimations",
+  "librarySort",
+  "historyEnabled",
 ];
 
 /**

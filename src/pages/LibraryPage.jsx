@@ -1,9 +1,10 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState, useEffect } from "react";
 import MediaCard from "../components/MediaCard";
 import { imgUrl } from "../utils/api";
 import { EyeIcon, WatchedIcon } from "../components/Icons";
 import { useRatings, getRatingForItem } from "../utils/useRatings";
 import { isRestricted } from "../utils/ageRating";
+import { storage, STORAGE_KEYS } from "../utils/storage";
 
 export default function LibraryPage({
   history,
@@ -20,6 +21,23 @@ export default function LibraryPage({
     [inProgress, saved],
   );
   const { ratingsMap, ageLimitSetting } = useRatings(allItems);
+
+  const [sort, setSort] = useState(
+    () => storage.get(STORAGE_KEYS.LIBRARY_SORT) || "manual",
+  );
+  useEffect(() => {
+    const handler = (e) => setSort(e.detail);
+    window.addEventListener("streambert:library-sort-changed", handler);
+    return () =>
+      window.removeEventListener("streambert:library-sort-changed", handler);
+  }, []);
+
+  const sortLabels = {
+    manual: "Custom order",
+    title: "A–Z",
+    rating: "Top rated",
+    year: "Newest first",
+  };
 
   const getRating = useCallback(
     (item) => getRatingForItem(item, ratingsMap),
@@ -72,6 +90,18 @@ export default function LibraryPage({
         <div className="library-section">
           <div className="library-section-title">
             Watchlist ({saved.length})
+            {sort !== "manual" && (
+              <span
+                style={{
+                  fontSize: 12,
+                  fontWeight: 400,
+                  color: "var(--text3)",
+                  marginLeft: 10,
+                }}
+              >
+                {sortLabels[sort]}
+              </span>
+            )}
           </div>
           <div className="cards-grid">
             {saved.map((item) => {

@@ -57,6 +57,13 @@ export const STORAGE_KEYS = {
   SUBTITLE_LANG: "subtitleLang",
   // NOTE: SUBDL_API_KEY and API_KEY are stored encrypted via secureStorage
   SUBDL_API_KEY: "subdlApiKey",
+  // Appearance & behaviour
+  ACCENT_COLOR: "accentColor",
+  FONT_SIZE: "fontSize",
+  COMPACT_MODE: "compactMode",
+  REDUCE_ANIMATIONS: "reduceAnimations",
+  LIBRARY_SORT: "librarySort",
+  HISTORY_ENABLED: "historyEnabled",
 };
 
 export const getApiKey = () => storage.get(STORAGE_KEYS.API_KEY);

@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import ErrorBoundary from "./components/ErrorBoundary";
 import KeyboardShortcutsModal from "./components/KeyboardShortcutsModal";
 import WindowTitlebar from "./components/WindowTitlebar";
-import { storage, secureStorage } from "./utils/storage";
+import { storage, secureStorage, STORAGE_KEYS } from "./utils/storage";
+import { applyAccentColor } from "./utils/appearance";
 import { collectBackupData } from "./utils/backup";
 import { tmdbFetch, setApiErrorHandlers } from "./utils/api";
 
@@ -29,6 +30,9 @@ export default function App() {
   const [page, setPage] = useState(() => storage.get("startPage") || "home");
   const [selected, setSelected] = useState(null);
   const [showSearch, setShowSearch] = useState(false);
+  const [librarySort, setLibrarySort] = useState(
+    () => storage.get(STORAGE_KEYS.LIBRARY_SORT) || "manual",
+  );
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [platform, setPlatform] = useState(null);
 
@@ -248,7 +252,29 @@ export default function App() {
     fetchTrending();
   }, [offline, fetchTrending]);
 
-  // ── Network status ───────────────────────────────────────────────────────
+  // ── Sync librarySort when changed from Settings ───────────────────────────
+  useEffect(() => {
+    const handler = (e) => setLibrarySort(e.detail);
+    window.addEventListener("streambert:library-sort-changed", handler);
+    return () =>
+      window.removeEventListener("streambert:library-sort-changed", handler);
+  }, []);
+  useEffect(() => {
+    // Accent colour
+    const accent = storage.get(STORAGE_KEYS.ACCENT_COLOR) || "red";
+    applyAccentColor(accent);
+    // Font size
+    const font = storage.get(STORAGE_KEYS.FONT_SIZE) || "normal";
+    const zoomMap = { sm: 0.85, normal: 1, lg: 1.15 };
+    const factor = zoomMap[font] ?? 1;
+    if (window.electron?.setZoomFactor) window.electron.setZoomFactor(factor);
+    // Compact mode
+    const compact = !!storage.get(STORAGE_KEYS.COMPACT_MODE);
+    document.body.classList.toggle("compact-mode", compact);
+    // Reduce animations
+    const noAnim = !!storage.get(STORAGE_KEYS.REDUCE_ANIMATIONS);
+    document.body.classList.toggle("no-anim", noAnim);
+  }, []);
   useEffect(() => {
     const goOnline = () => setOffline(false);
     const goOffline = () => setOffline(true);
@@ -402,6 +428,9 @@ export default function App() {
   );
 
   const addHistory = useCallback((item) => {
+    // Respect the "disable watch history" setting
+    const historyEnabled = storage.get(STORAGE_KEYS.HISTORY_ENABLED);
+    if (historyEnabled === 0 || historyEnabled === false) return;
     const entry = {
       id: item.id,
       title: item.title || item.name,
@@ -489,8 +518,21 @@ export default function App() {
     const orderedKeys = savedOrder
       ? savedOrder.filter((k) => saved[k])
       : Object.keys(saved);
-    return orderedKeys.map((k) => saved[k]).filter(Boolean);
-  }, [saved, savedOrder]);
+    const list = orderedKeys.map((k) => saved[k]).filter(Boolean);
+    if (librarySort === "title")
+      return [...list].sort((a, b) =>
+        (a.title || "").localeCompare(b.title || ""),
+      );
+    if (librarySort === "rating")
+      return [...list].sort(
+        (a, b) => (b.vote_average || 0) - (a.vote_average || 0),
+      );
+    if (librarySort === "year")
+      return [...list].sort((a, b) =>
+        (b.year || "").localeCompare(a.year || ""),
+      );
+    return list;
+  }, [saved, savedOrder, librarySort]);
 
   const handleReorderSaved = useCallback((newOrder) => {
     setSavedOrder(newOrder);

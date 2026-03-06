@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require("electron");
+const { contextBridge, ipcRenderer, webFrame } = require("electron");
 
 contextBridge.exposeInMainWorld("electron", {
   // m3u8 capture
@@ -119,6 +119,7 @@ contextBridge.exposeInMainWorld("electron", {
   windowClose: () => ipcRenderer.invoke("window-close"),
   windowIsMaximized: () => ipcRenderer.invoke("window-is-maximized"),
   getPlatform: () => ipcRenderer.invoke("get-platform"),
+  setZoomFactor: (factor) => webFrame.setZoomFactor(factor),
   // Auto-updater
   detectUpdateFormat: () => ipcRenderer.invoke("detect-update-format"),
   downloadAndInstallUpdate: (args) =>
