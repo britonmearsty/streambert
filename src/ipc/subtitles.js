@@ -10,6 +10,15 @@ const http = require("http");
 const os = require("os");
 const zlib = require("zlib");
 
+// ── Robust fetch with timeout (AbortSignal.timeout is unreliable in some Electron versions) ──
+function fetchWithTimeout(url, options = {}, ms = 15000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  return fetch(url, { ...options, signal: controller.signal }).finally(() =>
+    clearTimeout(timer),
+  );
+}
+
 // ── ZIP subtitle extractor ────────────────────────────────────────────────────
 
 function extractFirstSubtitleFromZip(buf) {
@@ -109,12 +118,10 @@ function register({ getDownloads, saveDownloads }) {
             params.set("episode_number", String(episode));
           if (languages) params.set("languages", toSubDLLang(languages));
 
-          const res = await fetch(
+          const res = await fetchWithTimeout(
             `https://api.subdl.com/api/v1/subtitles?${params}`,
-            {
-              headers: { "User-Agent": "Streambert v1" },
-              signal: AbortSignal.timeout(12000),
-            },
+            { headers: { "User-Agent": "Streambert" } },
+            12000,
           );
           if (!res.ok) {
             const errText = await res.text().catch(() => "");
@@ -145,7 +152,11 @@ function register({ getDownloads, saveDownloads }) {
             return { ok: false, error: "SubDL: no results" };
           return { ok: true, results, via_subdl: true };
         } catch (e) {
-          return { ok: false, error: e.message };
+          const msg =
+            e.name === "AbortError"
+              ? "SubDL timed out, server may be temporarily unavailable"
+              : e.message;
+          return { ok: false, error: msg };
         }
       }
 
@@ -160,9 +171,11 @@ function register({ getDownloads, saveDownloads }) {
             params.set("season", String(season));
           if (mediaType === "tv" && episode != null)
             params.set("episode", String(episode));
-          const res = await fetch(`https://subs.wyzie.ru/search?${params}`, {
-            signal: AbortSignal.timeout(12000),
-          });
+          const res = await fetchWithTimeout(
+            `https://subs.wyzie.ru/search?${params}`,
+            {},
+            12000,
+          );
           if (!res.ok) return { ok: false, error: `Wyzie error ${res.status}` };
           const data = await res.json();
           const results = (Array.isArray(data) ? data : [])
@@ -207,10 +220,13 @@ function register({ getDownloads, saveDownloads }) {
             return { ok: false, error: "Wyzie: no results" };
           return { ok: true, results, via_wyzie: true };
         } catch (e) {
-          return { ok: false, error: e.message };
+          const msg =
+            e.name === "AbortError"
+              ? "Subtitle service timed out, it may be temporarily down. Try adding a free SubDL API key in Settings for reliable results."
+              : e.message;
+          return { ok: false, error: msg };
         }
       }
-
       const errors = [];
       if (subdlApiKey) {
         const r = await searchSubDL();
@@ -220,10 +236,12 @@ function register({ getDownloads, saveDownloads }) {
       const r = await searchWyzie();
       if (r.ok) return r;
       errors.push(r.error);
+      const allTimedOut = errors.every((e) => e && e.includes("timed out"));
       return {
         ok: false,
-        error:
-          errors.length > 0
+        error: allTimedOut
+          ? "Subtitle service timed out, it may be temporarily down. Add a free SubDL API key in Settings for reliable results."
+          : errors.length > 0
             ? errors.join(" · ")
             : "No subtitles found. Try a different language or add a SubDL API key in Settings.",
       };
@@ -237,10 +255,11 @@ function register({ getDownloads, saveDownloads }) {
         const parts = String(fileId).split("_");
         const subdlPath = decodeURIComponent(parts.slice(2).join("_"));
         const downloadUrl = `https://dl.subdl.com${subdlPath}`;
-        const res = await fetch(downloadUrl, {
-          headers: { "User-Agent": "Streambert v1" },
-          signal: AbortSignal.timeout(30000),
-        });
+        const res = await fetchWithTimeout(
+          downloadUrl,
+          { headers: { "User-Agent": "Streambert" } },
+          30000,
+        );
         if (!res.ok)
           return { ok: false, error: `SubDL download error ${res.status}` };
         const zipBuffer = Buffer.from(await res.arrayBuffer());
@@ -303,10 +322,11 @@ function register({ getDownloads, saveDownloads }) {
             if (String(sub.file_id).startsWith("subdl_")) {
               const parts = String(sub.file_id).split("_");
               const subdlPath = decodeURIComponent(parts.slice(2).join("_"));
-              const res = await fetch(`https://dl.subdl.com${subdlPath}`, {
-                headers: { "User-Agent": "Streambert v1" },
-                signal: AbortSignal.timeout(30000),
-              });
+              const res = await fetchWithTimeout(
+                `https://dl.subdl.com${subdlPath}`,
+                { headers: { "User-Agent": "Streambert" } },
+                30000,
+              );
               if (!res.ok) continue;
               const zipBuf = Buffer.from(await res.arrayBuffer());
               const extracted = extractFirstSubtitleFromZip(zipBuf);
@@ -322,9 +342,7 @@ function register({ getDownloads, saveDownloads }) {
                     )
                   : null);
               if (!url) continue;
-              const res = await fetch(url, {
-                signal: AbortSignal.timeout(30000),
-              });
+              const res = await fetchWithTimeout(url, {}, 30000);
               if (!res.ok) continue;
               fileData = Buffer.from(await res.arrayBuffer());
               const urlExt = url.split("?")[0].split(".").pop().toLowerCase();

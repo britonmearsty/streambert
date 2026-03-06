@@ -782,10 +782,10 @@ function SubtitleDownloaderModal({
   onSubtitleDeleted,
 }) {
   const defaultLang = storage.get(STORAGE_KEYS.SUBTITLE_LANG) || "en";
-  const [subdlApiKey, setSubdlApiKey] = useState("");
+  const [subdlApiKey, setSubdlApiKey] = useState(null); // null = not yet loaded
   useEffect(() => {
     secureStorage.get(STORAGE_KEYS.SUBDL_API_KEY).then((val) => {
-      if (val) setSubdlApiKey(val);
+      setSubdlApiKey(val || "");
     });
   }, []);
 
@@ -835,8 +835,10 @@ function SubtitleDownloaderModal({
   );
 
   useEffect(() => {
+    // Wait until subdlApiKey has been loaded from secure storage before searching
+    if (subdlApiKey === null) return;
     doSearch(langFilter);
-  }, []);
+  }, [subdlApiKey]);
 
   const handleDownload = async () => {
     if (!selectedSubs.length || !dl.filePath) return;
