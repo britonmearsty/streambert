@@ -66,8 +66,8 @@
     --red-glow: 0 0 30px rgba(229, 9, 20, 0.3);
     --gold: #c8a84b;
     --text: #f0f0f0;
-    --text2: #aaaaaa;
-    --text3: #666666;
+    --text2: #c0c0c0;
+    --text3: #909090;
     --sidebar: 72px;
     --radius: 8px;
     --font-display: "Bebas Neue", sans-serif;
@@ -3522,4 +3522,14 @@ html[data-win-titlebar] .sidebar {
 html[data-win-titlebar] .main {
     margin-top: 32px;
     height: calc(100vh - 32px);
+}
+
+::highlight(settings-search) {
+    background-color: rgba(255, 193, 7, 0.38);
+    color: inherit;
+}
+
+::highlight(settings-search-active) {
+    background-color: rgba(255, 140, 0, 0.82);
+    color: #111;
 }

@@ -1680,8 +1680,8 @@ function SectionGroupHeader({ title, subtitle }) {
         <div
           style={{
             fontFamily: "var(--font-display)",
-            fontSize: 11,
-            letterSpacing: 3,
+            fontSize: 16,
+            letterSpacing: 2,
             color: "var(--red)",
             textTransform: "uppercase",
             fontWeight: 700,
@@ -1856,15 +1856,155 @@ const SECTION_NAV = [
   },
 ];
 
-function SettingsTopBar({ sectionRefs }) {
+function SettingsTopBar({ sectionRefs, contentRef }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [matchCount, setMatchCount] = useState(0);
+  const [currentMatch, setCurrentMatch] = useState(0);
+  const matchRanges = useRef([]);
+  const currentMatchRef = useRef(0);
+  const matchCountRef = useRef(0);
   const inputRef = useRef(null);
   const navRef = useRef(null);
-  const barRef = useRef(null);
+  const searchBarRef = useRef(null);
 
-  // Close nav dropdown on outside click
+  const supportsHighlight =
+    typeof CSS !== "undefined" && typeof CSS.highlights !== "undefined";
+
+  const clearHighlights = () => {
+    if (supportsHighlight) {
+      CSS.highlights.delete("settings-search");
+      CSS.highlights.delete("settings-search-active");
+    }
+    matchRanges.current = [];
+    matchCountRef.current = 0;
+    currentMatchRef.current = 0;
+    setMatchCount(0);
+    setCurrentMatch(0);
+  };
+
+  const scrollToRange = (range) => {
+    if (!range) return;
+    requestAnimationFrame(() => {
+      try {
+        const el = range.startContainer.parentElement;
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      } catch (_) {}
+    });
+  };
+
+  const setActiveMatch = (idx) => {
+    const range = matchRanges.current[idx];
+    if (!range) return;
+    if (supportsHighlight) {
+      CSS.highlights.set("settings-search-active", new Highlight(range));
+    }
+    scrollToRange(range);
+    currentMatchRef.current = idx + 1;
+    setCurrentMatch(idx + 1);
+  };
+
+  const findMatches = (searchQuery) => {
+    clearHighlights();
+    if (!contentRef?.current || !searchQuery.trim()) return;
+
+    const str = searchQuery.toLowerCase();
+    const ranges = [];
+    const walker = document.createTreeWalker(
+      contentRef.current,
+      NodeFilter.SHOW_TEXT,
+    );
+
+    let node;
+    while ((node = walker.nextNode())) {
+      const text = node.textContent.toLowerCase();
+      let idx = 0;
+      while ((idx = text.indexOf(str, idx)) !== -1) {
+        const range = new Range();
+        range.setStart(node, idx);
+        range.setEnd(node, idx + searchQuery.length);
+        ranges.push(range);
+        idx += str.length;
+      }
+    }
+
+    matchRanges.current = ranges;
+    matchCountRef.current = ranges.length;
+    setMatchCount(ranges.length);
+
+    if (ranges.length > 0) {
+      if (supportsHighlight) {
+        CSS.highlights.set("settings-search", new Highlight(...ranges));
+      }
+      setActiveMatch(0);
+    }
+  };
+
+  const goNext = () => {
+    const total = matchCountRef.current;
+    if (total === 0) return;
+    const next = currentMatchRef.current < total ? currentMatchRef.current : 0;
+    setActiveMatch(next);
+  };
+
+  const goPrev = () => {
+    const total = matchCountRef.current;
+    if (total === 0) return;
+    const prev =
+      currentMatchRef.current > 1 ? currentMatchRef.current - 2 : total - 1;
+    setActiveMatch(prev);
+  };
+
+  const closeSearch = () => {
+    setSearchOpen(false);
+    setQuery("");
+    clearHighlights();
+  };
+
+  // Focus on open
+  useEffect(() => {
+    if (searchOpen) {
+      setTimeout(() => {
+        inputRef.current?.focus();
+        inputRef.current?.select();
+      }, 30);
+    }
+  }, [searchOpen]);
+
+  // Clean up on unmount
+  useEffect(() => () => clearHighlights(), []);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === "Escape") {
+        closeSearch();
+        setNavOpen(false);
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "f")) {
+        e.preventDefault();
+        setSearchOpen(true);
+        return;
+      }
+      if (e.key === "F3") {
+        e.preventDefault();
+        if (e.shiftKey) goPrev();
+        else goNext();
+        return;
+      }
+      if (searchOpen && e.key === "Enter") {
+        e.preventDefault();
+        if (e.shiftKey) goPrev();
+        else goNext();
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [searchOpen]);
+
+  // Close nav on outside click
   useEffect(() => {
     if (!navOpen) return;
     const handler = (e) => {
@@ -1875,61 +2015,60 @@ function SettingsTopBar({ sectionRefs }) {
     return () => document.removeEventListener("mousedown", handler);
   }, [navOpen]);
 
-  // Focus input when search opens
+  // Clear highlights + close search when clicking outside the search bar
   useEffect(() => {
-    if (searchOpen && inputRef.current) inputRef.current.focus();
-  }, [searchOpen]);
-
-  // Escape closes search / ⌘K opens it
-  useEffect(() => {
+    if (!searchOpen) return;
     const handler = (e) => {
-      if (e.key === "Escape") {
+      if (searchBarRef.current && !searchBarRef.current.contains(e.target)) {
+        clearHighlights();
         setSearchOpen(false);
         setQuery("");
-        setNavOpen(false);
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        setSearchOpen((o) => !o);
-        if (searchOpen) setQuery("");
       }
     };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
   }, [searchOpen]);
 
   const scrollTo = (id) => {
     const el = sectionRefs[id]?.current;
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
     setNavOpen(false);
-    setSearchOpen(false);
-    setQuery("");
   };
 
-  const matches = query.trim()
-    ? SECTION_NAV.filter(
-        (s) =>
-          s.label.toLowerCase().includes(query.toLowerCase()) ||
-          s.keywords.some((kw) => kw.includes(query.toLowerCase())),
-      )
-    : [];
+  const handleQueryChange = (e) => {
+    const val = e.target.value;
+    setQuery(val);
+    findMatches(val);
+  };
 
-  const hasResults = query.trim().length > 0;
+  const noMatch = query.trim().length > 0 && matchCount === 0;
+  const hasQuery = query.trim().length > 0;
+
+  const navBtnStyle = {
+    background: "none",
+    border: "none",
+    cursor: "pointer",
+    color: "var(--text2)",
+    display: "flex",
+    alignItems: "center",
+    padding: "4px 5px",
+    borderRadius: 5,
+    transition: "background 0.1s",
+    flexShrink: 0,
+  };
 
   return (
     <div
-      ref={barRef}
       style={{
         position: "sticky",
         top: 0,
         zIndex: 100,
         background: "var(--bg, #141414)",
-        borderBottom: `1px solid ${searchOpen && hasResults ? "transparent" : "var(--border)"}`,
+        borderBottom: "1px solid var(--border)",
         padding: "0 48px",
         backdropFilter: "blur(12px)",
       }}
     >
-      {/* Main bar row */}
       <div
         style={{
           display: "flex",
@@ -1938,23 +2077,26 @@ function SettingsTopBar({ sectionRefs }) {
           padding: "10px 0",
         }}
       >
-        {/* Search area */}
+        {/* ── Search area ── */}
         <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8 }}>
           {searchOpen ? (
             <div
+              ref={searchBarRef}
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 10,
+                gap: 6,
                 flex: 1,
-                maxWidth: 480,
+                maxWidth: 540,
                 background: "var(--surface2)",
-                border: "1px solid var(--red)",
+                border: `1px solid ${noMatch ? "#ff3860" : "var(--red)"}`,
                 borderRadius: 8,
-                padding: "6px 12px",
-                boxShadow: "0 0 0 3px rgba(229,9,20,0.1)",
+                padding: "5px 8px 5px 12px",
+                boxShadow: `0 0 0 3px ${noMatch ? "rgba(255,56,96,0.1)" : "rgba(229,9,20,0.1)"}`,
+                transition: "border-color 0.15s, box-shadow 0.15s",
               }}
             >
+              {/* Search icon */}
               <svg
                 width="14"
                 height="14"
@@ -1969,40 +2111,123 @@ function SettingsTopBar({ sectionRefs }) {
                 <circle cx="11" cy="11" r="8" />
                 <line x1="21" y1="21" x2="16.65" y2="16.65" />
               </svg>
+
+              {/* Input */}
               <input
                 ref={inputRef}
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search settings…"
+                onChange={handleQueryChange}
+                placeholder="Search on this page…"
                 style={{
                   flex: 1,
                   background: "transparent",
                   border: "none",
                   outline: "none",
                   fontSize: 14,
-                  color: "var(--text)",
+                  color: noMatch ? "#ff3860" : "var(--text)",
                   fontFamily: "var(--font-body)",
                   minWidth: 0,
                 }}
               />
-              {query && (
-                <button
-                  onClick={() => setQuery("")}
+
+              {/* Match counter */}
+              {hasQuery && (
+                <span
                   style={{
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    color: "var(--text3)",
-                    display: "flex",
-                    alignItems: "center",
-                    padding: 2,
-                    borderRadius: 4,
+                    fontSize: 12,
+                    color: noMatch ? "#ff3860" : "var(--text3)",
+                    fontVariantNumeric: "tabular-nums",
+                    whiteSpace: "nowrap",
+                    padding: "0 8px",
+                    borderLeft: "1px solid var(--border)",
+                    borderRight: "1px solid var(--border)",
+                    margin: "0 2px",
+                    flexShrink: 0,
                   }}
-                  title="Clear"
+                >
+                  {noMatch ? "No results" : `${currentMatch} / ${matchCount}`}
+                </span>
+              )}
+
+              {/* Prev button */}
+              {matchCount > 0 && (
+                <button
+                  onClick={goPrev}
+                  title="Previous match (Shift+Enter)"
+                  style={navBtnStyle}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.background =
+                      "rgba(255,255,255,0.08)")
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.background = "none")
+                  }
                 >
                   <svg
                     width="13"
                     height="13"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="18 15 12 9 6 15" />
+                  </svg>
+                </button>
+              )}
+
+              {/* Next button */}
+              {matchCount > 0 && (
+                <button
+                  onClick={goNext}
+                  title="Next match (Enter)"
+                  style={navBtnStyle}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.background =
+                      "rgba(255,255,255,0.08)")
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.background = "none")
+                  }
+                >
+                  <svg
+                    width="13"
+                    height="13"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </button>
+              )}
+
+              {/* Divider + Clear */}
+              {query && (
+                <button
+                  onClick={() => {
+                    setQuery("");
+                    clearHighlights();
+                    inputRef.current?.focus();
+                  }}
+                  title="Clear search"
+                  style={{ ...navBtnStyle, color: "var(--text3)" }}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.background =
+                      "rgba(255,255,255,0.08)")
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.background = "none")
+                  }
+                >
+                  <svg
+                    width="12"
+                    height="12"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
@@ -2014,24 +2239,23 @@ function SettingsTopBar({ sectionRefs }) {
                   </svg>
                 </button>
               )}
+
+              {/* Esc button */}
               <button
-                onClick={() => {
-                  setSearchOpen(false);
-                  setQuery("");
-                }}
+                onClick={closeSearch}
+                title="Close (Esc)"
                 style={{
                   background: "none",
                   border: "none",
                   cursor: "pointer",
                   color: "var(--text3)",
-                  display: "flex",
-                  alignItems: "center",
-                  padding: "2px 6px",
                   fontSize: 11,
+                  padding: "3px 7px",
                   borderRadius: 4,
-                  marginLeft: 2,
+                  fontFamily: "var(--font-body)",
+                  flexShrink: 0,
+                  letterSpacing: 0.3,
                 }}
-                title="Close (Esc)"
               >
                 Esc
               </button>
@@ -2092,7 +2316,7 @@ function SettingsTopBar({ sectionRefs }) {
           )}
         </div>
 
-        {/* Jump to section dropdown */}
+        {/* ── Jump to section dropdown ── */}
         <div ref={navRef} style={{ position: "relative", flexShrink: 0 }}>
           <button
             onClick={() => setNavOpen((o) => !o)}
@@ -2219,81 +2443,6 @@ function SettingsTopBar({ sectionRefs }) {
           )}
         </div>
       </div>
-
-      {/* Search results panel — inline, no modal */}
-      {searchOpen && hasResults && (
-        <div
-          style={{
-            borderTop: "1px solid var(--border)",
-            padding: "12px 0 14px",
-          }}
-        >
-          {matches.length === 0 ? (
-            <div
-              style={{ fontSize: 13, color: "var(--text3)", paddingLeft: 2 }}
-            >
-              No results for <em>"{query}"</em>
-            </div>
-          ) : (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                flexWrap: "wrap",
-              }}
-            >
-              <span
-                style={{ fontSize: 12, color: "var(--text3)", marginRight: 4 }}
-              >
-                Go to:
-              </span>
-              {matches.map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() => scrollTo(s.id)}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 6,
-                    background: "rgba(229,9,20,0.09)",
-                    border: "1px solid rgba(229,9,20,0.25)",
-                    borderRadius: 20,
-                    padding: "5px 13px",
-                    fontSize: 13,
-                    color: "var(--red)",
-                    cursor: "pointer",
-                    transition: "all 0.15s",
-                    fontFamily: "var(--font-body)",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "rgba(229,9,20,0.2)";
-                    e.currentTarget.style.borderColor = "rgba(229,9,20,0.5)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "rgba(229,9,20,0.09)";
-                    e.currentTarget.style.borderColor = "rgba(229,9,20,0.25)";
-                  }}
-                >
-                  <span>{s.icon}</span>
-                  {s.label}
-                  <svg
-                    width="11"
-                    height="11"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                  >
-                    <polyline points="9 18 15 12 9 6" />
-                  </svg>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
@@ -2334,6 +2483,9 @@ export default function SettingsPage({ apiKey, onChangeApiKey }) {
     backup: secBackup,
     storage: secStorage,
   };
+
+  // Ref for find-in-page search scope
+  const contentRef = useRef(null);
 
   // Age Rating
   const [ratingCountry, setRatingCountry] = useState(
@@ -2540,9 +2692,13 @@ export default function SettingsPage({ apiKey, onChangeApiKey }) {
       )}
 
       {/* ── Sticky search & navigation bar ── */}
-      <SettingsTopBar sectionRefs={sectionRefs} />
+      <SettingsTopBar sectionRefs={sectionRefs} contentRef={contentRef} />
 
-      <div className="fade-in" style={{ padding: "40px 48px 80px" }}>
+      <div
+        ref={contentRef}
+        className="fade-in"
+        style={{ padding: "40px 48px 80px" }}
+      >
         {/* Page title */}
         <div
           style={{
