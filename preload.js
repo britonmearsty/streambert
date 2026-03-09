@@ -119,6 +119,8 @@ contextBridge.exposeInMainWorld("electron", {
   windowClose: () => ipcRenderer.invoke("window-close"),
   windowIsMaximized: () => ipcRenderer.invoke("window-is-maximized"),
   getPlatform: () => ipcRenderer.invoke("get-platform"),
+  getVideoDuration: (filePath) =>
+    ipcRenderer.invoke("get-video-duration", filePath),
   setZoomFactor: (factor) => webFrame.setZoomFactor(factor),
   // Auto-updater
   detectUpdateFormat: () => ipcRenderer.invoke("detect-update-format"),

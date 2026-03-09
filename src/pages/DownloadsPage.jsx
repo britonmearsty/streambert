@@ -511,9 +511,13 @@ function LocalFileCard({
   const [savedSecs, setSavedSecs] = useState(() =>
     storageKey ? (storage.get(storageKey) ?? null) : null,
   );
-  const [editing, setEditing] = useState(false);
-  const [editVal, setEditVal] = useState("");
-  const inputRef = useRef(null);
+  const [showPopover, setShowPopover] = useState(false);
+  const [popoverSecs, setPopoverSecs] = useState(0);
+  const [popoverText, setPopoverText] = useState("");
+  const [videoDuration, setVideoDuration] = useState(null);
+  const [durationLoading, setDurationLoading] = useState(false);
+  const popoverRef = useRef(null);
+  const fetchingRef = useRef(false);
 
   // Re-sync from storage when key changes (picks up progress from online watching)
   useEffect(() => {
@@ -521,30 +525,87 @@ function LocalFileCard({
     setSavedSecs(storage.get(storageKey) ?? null);
   }, [storageKey]);
 
-  const startEdit = useCallback(() => {
-    setEditVal(secsToHms(savedSecs) ?? "");
-    setEditing(true);
+  // Fetch video duration once when popover first opens
+  useEffect(() => {
+    if (
+      !showPopover ||
+      !dl.filePath ||
+      videoDuration !== null ||
+      fetchingRef.current
+    )
+      return;
+    if (!window.electron?.getVideoDuration) return;
+    fetchingRef.current = true;
+    setDurationLoading(true);
+    window.electron
+      .getVideoDuration(dl.filePath)
+      .then((res) => {
+        if (res?.ok && res.duration > 0) setVideoDuration(res.duration);
+      })
+      .catch(() => {})
+      .finally(() => {
+        setDurationLoading(false);
+        fetchingRef.current = false;
+      });
+  }, [showPopover, dl.filePath, videoDuration]);
+
+  // Close on outside click
+  useEffect(() => {
+    if (!showPopover) return;
+    const handler = (e) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target))
+        setShowPopover(false);
+    };
+    setTimeout(() => document.addEventListener("mousedown", handler), 0);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showPopover]);
+
+  const openPopover = useCallback(() => {
+    const s = savedSecs ?? 0;
+    setPopoverSecs(s);
+    setPopoverText(secsToHms(s) ?? "00:00:00");
+    setShowPopover(true);
   }, [savedSecs]);
 
-  useEffect(() => {
-    if (editing && inputRef.current) inputRef.current.focus();
-  }, [editing]);
+  const handleSliderChange = useCallback((e) => {
+    const s = Number(e.target.value);
+    setPopoverSecs(s);
+    setPopoverText(secsToHms(s) ?? "00:00:00");
+  }, []);
 
-  const commitEdit = useCallback(() => {
-    const secs = hmsToSecs(editVal);
-    if (secs !== null && storageKey) {
-      storage.set(storageKey, secs);
-      setSavedSecs(secs);
+  const handleTextChange = useCallback((e) => {
+    setPopoverText(e.target.value);
+    const s = hmsToSecs(e.target.value);
+    if (s !== null) setPopoverSecs(s);
+  }, []);
+
+  const commitPopover = useCallback(() => {
+    let s = hmsToSecs(popoverText);
+    if (s === null) s = popoverSecs;
+    if (s !== null && storageKey) {
+      const clamped = videoDuration
+        ? Math.min(Math.max(0, s), videoDuration)
+        : Math.max(0, s);
+      storage.set(storageKey, clamped);
+      setSavedSecs(clamped);
     }
-    setEditing(false);
-  }, [editVal, storageKey]);
+    setShowPopover(false);
+  }, [popoverText, popoverSecs, storageKey, videoDuration]);
 
-  const handleKeyDown = useCallback(
+  const resetProgress = useCallback(() => {
+    if (storageKey) {
+      storage.set(storageKey, null);
+      setSavedSecs(null);
+    }
+    setShowPopover(false);
+  }, [storageKey]);
+
+  const handlePopoverKeyDown = useCallback(
     (e) => {
-      if (e.key === "Enter") commitEdit();
-      if (e.key === "Escape") setEditing(false);
+      if (e.key === "Enter") commitPopover();
+      if (e.key === "Escape") setShowPopover(false);
     },
-    [commitEdit],
+    [commitPopover],
   );
 
   const handleWatch = useCallback(() => {
@@ -572,7 +633,9 @@ function LocalFileCard({
     if (isWatched) return null;
     if (!storageKey) return null;
     if (!savedSecs) return "Not started";
-    return secsToHms(savedSecs);
+    return videoDuration
+      ? `${secsToHms(savedSecs)} / ${secsToHms(videoDuration)}`
+      : secsToHms(savedSecs);
   })();
 
   return (
@@ -688,36 +751,173 @@ function LocalFileCard({
             )}
 
             {progressLabel !== null && storageKey && (
-              <span
-                className={`dl-progress-pill${savedSecs ? " dl-progress-pill--active" : " dl-progress-pill--empty"}`}
-              >
-                {editing ? (
-                  <input
-                    ref={inputRef}
-                    className="dl-progress-pill__input"
-                    value={editVal}
-                    onChange={(e) => setEditVal(e.target.value)}
-                    onBlur={commitEdit}
-                    onKeyDown={handleKeyDown}
-                    placeholder="HH:MM:SS"
-                  />
-                ) : (
-                  <span
-                    className="dl-progress-pill__label"
-                    onClick={startEdit}
-                    title="Click to set resume position"
-                  >
+              <span style={{ position: "relative", display: "inline-flex" }}>
+                <span
+                  className={`dl-progress-pill${savedSecs ? " dl-progress-pill--active" : " dl-progress-pill--empty"}`}
+                  onClick={openPopover}
+                  title="Set watch progress"
+                  style={{ cursor: "pointer", userSelect: "none" }}
+                >
+                  <span className="dl-progress-pill__label">
                     {progressLabel}
                   </span>
-                )}
-                {!editing && (
-                  <span
-                    className="dl-progress-pill__edit-icon"
-                    onClick={startEdit}
-                    title="Edit"
+                  <span className="dl-progress-pill__edit-icon">✎</span>
+                </span>
+
+                {showPopover && (
+                  <div
+                    ref={popoverRef}
+                    style={{
+                      position: "absolute",
+                      bottom: "calc(100% + 6px)",
+                      left: 0,
+                      zIndex: 9999,
+                      background: "var(--surface)",
+                      border: "1px solid var(--border)",
+                      borderRadius: 10,
+                      padding: "10px 12px 9px",
+                      width: 240,
+                      boxShadow: "0 6px 24px rgba(0,0,0,0.55)",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 7,
+                    }}
                   >
-                    ✎
-                  </span>
+                    {/* Header: time display + close */}
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "baseline",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "baseline",
+                          gap: 4,
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: 16,
+                            fontWeight: 700,
+                            fontVariantNumeric: "tabular-nums",
+                            color: "var(--text)",
+                          }}
+                        >
+                          {secsToHms(popoverSecs) ?? "00:00:00"}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            color: "var(--text3)",
+                            fontVariantNumeric: "tabular-nums",
+                          }}
+                        >
+                          {durationLoading
+                            ? "/ …"
+                            : videoDuration
+                              ? `/ ${secsToHms(videoDuration)}`
+                              : ""}
+                        </span>
+                      </div>
+                      <button
+                        className="icon-btn"
+                        onClick={() => setShowPopover(false)}
+                        style={{ fontSize: 12, padding: "0 3px" }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    {/* Slider (only when duration known) */}
+                    {videoDuration && (
+                      <div>
+                        <input
+                          type="range"
+                          min={0}
+                          max={Math.floor(videoDuration)}
+                          step={1}
+                          value={Math.min(
+                            popoverSecs,
+                            Math.floor(videoDuration),
+                          )}
+                          onChange={handleSliderChange}
+                          style={{
+                            width: "100%",
+                            accentColor: "var(--red)",
+                            cursor: "pointer",
+                            height: 3,
+                          }}
+                        />
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            fontSize: 10,
+                            color: "var(--text3)",
+                            marginTop: 1,
+                          }}
+                        >
+                          <span>0:00</span>
+                          <span
+                            style={{ fontWeight: 600, color: "var(--text2)" }}
+                          >
+                            {Math.round((popoverSecs / videoDuration) * 100)}%
+                          </span>
+                          <span>{secsToHms(videoDuration)}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Text input + Reset + Save */}
+                    <div style={{ display: "flex", gap: 5 }}>
+                      <input
+                        type="text"
+                        value={popoverText}
+                        onChange={handleTextChange}
+                        onKeyDown={handlePopoverKeyDown}
+                        placeholder="HH:MM:SS"
+                        autoFocus
+                        style={{
+                          flex: 1,
+                          minWidth: 0,
+                          background: "var(--surface2)",
+                          border: "1px solid var(--border)",
+                          borderRadius: 6,
+                          color: "var(--text)",
+                          fontSize: 12,
+                          fontVariantNumeric: "tabular-nums",
+                          fontWeight: 600,
+                          padding: "5px 8px",
+                          outline: "none",
+                          letterSpacing: "0.04em",
+                        }}
+                        onFocus={(e) => {
+                          e.target.style.borderColor = "var(--red)";
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.borderColor = "var(--border)";
+                        }}
+                      />
+                      <button
+                        className="btn btn-ghost btn--sm"
+                        onClick={resetProgress}
+                        style={{ fontSize: 11, padding: "4px 7px" }}
+                        title="Reset"
+                      >
+                        ↺
+                      </button>
+                      <button
+                        className="btn btn-primary btn--sm"
+                        onClick={commitPopover}
+                        style={{ fontSize: 11, padding: "4px 9px" }}
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
                 )}
               </span>
             )}
