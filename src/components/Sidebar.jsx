@@ -112,13 +112,13 @@ export default function Sidebar({
         <SideBtn onClick={onBack} icon={<BackIcon />} label="Back (Ctrl+Z)" />
       )}
 
+      <SideBtn onClick={onSearch} icon={<SearchIcon />} label="Search  (⌘F)" />
       <SideBtn
         active={page === "home"}
         onClick={() => onNavigate("home")}
         icon={<HomeIcon />}
         label="Home"
       />
-      <SideBtn onClick={onSearch} icon={<SearchIcon />} label="Search  (⌘F)" />
       <SideBtn
         active={page === "history"}
         onClick={() => onNavigate("history")}
