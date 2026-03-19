@@ -233,7 +233,11 @@ export default function UpdateModal({
 
   return (
     <div
-      onClick={handleCancel}
+      onClick={
+        phase === "downloading" || phase === "installing"
+          ? undefined
+          : handleCancel
+      }
       style={{
         position: "fixed",
         inset: 0,
@@ -244,6 +248,10 @@ export default function UpdateModal({
         alignItems: "center",
         justifyContent: "center",
         padding: 24,
+        cursor:
+          phase === "downloading" || phase === "installing"
+            ? "default"
+            : "auto",
       }}
     >
       <div
@@ -343,12 +351,16 @@ export default function UpdateModal({
             </div>
             <button
               onClick={handleCancel}
+              disabled={phase === "downloading" || phase === "installing"}
               style={{
                 background: "transparent",
                 border: "1px solid var(--border)",
                 borderRadius: 6,
                 color: "var(--text3)",
-                cursor: "pointer",
+                cursor:
+                  phase === "downloading" || phase === "installing"
+                    ? "not-allowed"
+                    : "pointer",
                 fontSize: 18,
                 width: 28,
                 height: 28,
@@ -356,6 +368,8 @@ export default function UpdateModal({
                 alignItems: "center",
                 justifyContent: "center",
                 flexShrink: 0,
+                opacity:
+                  phase === "downloading" || phase === "installing" ? 0.35 : 1,
               }}
             >
               ×
