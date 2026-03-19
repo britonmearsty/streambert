@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from "react";
+import { applyEpisodeMapping } from "../utils/episodeMappings";
 import {
   tmdbFetch,
   imgUrl,
@@ -624,11 +625,10 @@ export default function TVPage({
   // ── Player episode mapping
   const playerEp = useMemo(() => {
     if (!selectedEp) return { season: selectedSeason, episode: undefined };
-    return {
-      season: selectedSeason,
-      episode: selectedEp._tmdbAbsolute ?? selectedEp.episode_number,
-    };
-  }, [selectedEp, selectedSeason]);
+    const rawSeason = selectedSeason;
+    const rawEpisode = selectedEp._tmdbAbsolute ?? selectedEp.episode_number;
+    return applyEpisodeMapping(item.id, rawSeason, rawEpisode);
+  }, [selectedEp, selectedSeason, item.id]);
 
   // ── Memoized current season episodes ──────────────────────────────────────
   const currentSeasonEpisodes = useMemo(
