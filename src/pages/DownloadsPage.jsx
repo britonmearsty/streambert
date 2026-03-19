@@ -175,6 +175,16 @@ export default function DownloadsPage({
     if (!confirm(`Delete "${dl.name}"${dl.filePath ? " and its file" : ""}?`))
       return;
     await window.electron.deleteDownload({ id: dl.id, filePath: dl.filePath });
+    // Clean up persisted duration
+    if (dl.id) storage.set(DURATION_PREFIX + dl.id, null);
+    // Clean up persisted progress time
+    const watchedKey =
+      dl.mediaType === "movie"
+        ? `movie_${dl.tmdbId || dl.mediaId}`
+        : dl.mediaType === "tv" && dl.tmdbId && dl.season && dl.episode
+          ? `tv_${dl.tmdbId}_s${dl.season}e${dl.episode}`
+          : null;
+    if (watchedKey) storage.set(PROGRESS_TIME_PREFIX + watchedKey, null);
     onDeleteDownload(dl.id);
   };
 
@@ -495,6 +505,7 @@ function hmsToSecs(str) {
 }
 
 const PROGRESS_TIME_PREFIX = "dlTime_";
+const DURATION_PREFIX = "dlDur_";
 
 // ── Local file / completed download card ──────────────────────────────────────
 const LocalFileCard = memo(function LocalFileCard({
@@ -518,6 +529,7 @@ const LocalFileCard = memo(function LocalFileCard({
   const canWatch = !!fileExists && !!dl.filePath;
 
   const storageKey = watchedKey ? PROGRESS_TIME_PREFIX + watchedKey : null;
+  const durKey = dl.id ? DURATION_PREFIX + dl.id : null;
   const [savedSecs, setSavedSecs] = useState(() =>
     storageKey ? (storage.get(storageKey) ?? null) : null,
   );
@@ -526,7 +538,9 @@ const LocalFileCard = memo(function LocalFileCard({
   const [popoverHH, setPopoverHH] = useState("00");
   const [popoverMM, setPopoverMM] = useState("00");
   const [popoverSS, setPopoverSS] = useState("00");
-  const [videoDuration, setVideoDuration] = useState(null);
+  const [videoDuration, setVideoDuration] = useState(() =>
+    durKey ? (storage.get(durKey) ?? null) : null,
+  );
   const [durationLoading, setDurationLoading] = useState(false);
   const popoverRef = useRef(null);
   const fetchingRef = useRef(false);
@@ -556,8 +570,10 @@ const LocalFileCard = memo(function LocalFileCard({
     window.electron
       .getVideoDuration(dl.filePath)
       .then((res) => {
-        if (mounted && res?.ok && res.duration > 0)
+        if (mounted && res?.ok && res.duration > 0) {
           setVideoDuration(res.duration);
+          if (durKey) storage.set(durKey, res.duration);
+        }
       })
       .catch(() => {})
       .finally(() => {
@@ -569,7 +585,7 @@ const LocalFileCard = memo(function LocalFileCard({
     return () => {
       mounted = false;
     };
-  }, [showPopover, dl.filePath, videoDuration]);
+  }, [showPopover, dl.filePath, videoDuration, durKey]);
 
   // Close on outside click
   useEffect(() => {
