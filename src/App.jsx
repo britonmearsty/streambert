@@ -567,11 +567,11 @@ export default function App() {
   if (!apiKey && !skipped)
     return <SetupScreen onSave={saveApiKey} onSkip={() => setSkipped(true)} />;
 
-  const isWindows = platform === "win32" || platform === "linux";
+  const hasCustomTitlebar = platform === "win32" || platform === "linux";
 
   return (
     <ErrorBoundary>
-      {isWindows && <WindowTitlebar />}
+      {hasCustomTitlebar && <WindowTitlebar />}
       <div>
         <Sidebar
           page={page}
@@ -720,7 +720,7 @@ export default function App() {
           <div
             style={{
               position: "fixed",
-              top: isWindows ? 32 : 0,
+              top: hasCustomTitlebar ? 32 : 0,
               left: 0,
               right: 0,
               zIndex: 9999,

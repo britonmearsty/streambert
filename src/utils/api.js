@@ -59,8 +59,9 @@ export const tmdbFetch = async (path, apiKey) => {
     throw new Error("TMDB unreachable");
   } finally {
     // releaseSlot is called in the catch above for network errors;
-    // for successful responses we release after parsing so the slot
-    // is held only during the actual in-flight request, not parsing.
+    // for successful responses it is called immediately below, before
+    // parsing. So the slot is held only during the actual in-flight
+    // request, not during res.json().
   }
 
   _releaseSlot();
