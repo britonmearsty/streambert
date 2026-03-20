@@ -797,9 +797,10 @@ export default function MoviePage({
                         : "")
                     }
                     onClick={() => {
+                      setShowSourceMenu(false);
+                      if (src.id === playerSource) return;
                       setPlayerSource(src.id);
                       storage.set("playerSource", src.id);
-                      setShowSourceMenu(false);
                       setM3u8Url(null);
                       setInterceptedSubs([]);
                       setResolvedPlayerUrl(null);
