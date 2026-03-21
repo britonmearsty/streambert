@@ -695,8 +695,10 @@ export default function TVPage({
   // ── Memoized current season episodes ──────────────────────────────────────
   // If this show has a known episode group but it hasn't loaded yet, return []
   // to avoid a flash of wrong TMDB episodes before the group data arrives.
-  const episodeGroupPending =
-    !!EPISODE_GROUP_IDS[Number(item.id)] && !episodeGroupData;
+  const episodeGroupPending = useMemo(
+    () => !!EPISODE_GROUP_IDS[Number(item.id)] && !episodeGroupData,
+    [item.id, episodeGroupData],
+  );
   const currentSeasonEpisodes = useMemo(
     () =>
       episodeGroupPending
