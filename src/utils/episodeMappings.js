@@ -1,48 +1,62 @@
 /**
- * Show-specific episode mappings.
+ * Show-specific episode group mappings.
  *
  * Some shows have a mismatch between TMDB season/episode numbering and
- * what streaming sources serve. TMDB may follow Netflix re-cuts or
- * combined-season numbering while sources use the original broadcast order.
+ * what streaming sources serve (e.g. Netflix re-cuts, combined seasons).
  *
- * Each entry maps a TMDB show ID to a function that receives
- * { season, episode } as TMDB numbers and returns the corrected
- * { season, episode } to send to the streaming source.
+ * Each entry maps a TMDB show ID to a TMDB Episode Group ID.
+ * The group is fetched once from the TMDB API and cached, it defines
+ * the exact season/episode numbering that streaming sources use.
+ *
+ * To find a group ID: https://www.themoviedb.org/tv/{id}/episode_groups
  */
-
-const MAPPINGS = {
-  // ── Money Heist / La Casa de Papel (TMDB ID: 71446) ──────────────────────
-  // TMDB follows original Spanish broadcast: S1 contains Part 1 (9 eps) +
-  // Part 2 (6 eps) = 15 episodes total in one season.
-  // Streaming sources use Part-based numbering: Part 1 = S1, Part 2 = S2,
-  // Part 3 = S3, etc. — so every TMDB season after S1 is off by one.
-  //
-  // TMDB S1 E1–9   → source S1 E1–9   (Part 1, no change)
-  // TMDB S1 E10–15 → source S2 E1–6   (Part 2)
-  // TMDB S2        → source S3         (Part 3)
-  // TMDB S3        → source S4         (Part 4)
-  // TMDB S4        → source S5         (Part 5)
-  71446: ({ season, episode }) => {
-    if (season === 1) {
-      if (episode <= 9) return { season: 1, episode };
-      return { season: 2, episode: episode - 9 };
-    }
-    // All later TMDB seasons are shifted by one because S1 was split
-    return { season: season + 1, episode };
-  },
+export const EPISODE_GROUP_IDS = {
+  // Money Heist / La Casa de Papel, Netflix order (13+9+8+8+5+5 eps)
+  71446: "5eb730dfca7ec6001f7beb51",
 };
 
 /**
- * Apply a show-specific episode mapping if one exists.
- * Falls through unchanged for shows without a mapping.
+ * Apply a dynamic episode group mapping if one is loaded.
+ * Falls through unchanged when no mapping is available.
  *
  * @param {number|string} tmdbId
  * @param {number} season
  * @param {number} episode
+ * @param {Map|null} groupMap  Built by buildEpisodeGroupMap()
  * @returns {{ season: number, episode: number }}
  */
-export function applyEpisodeMapping(tmdbId, season, episode) {
-  const fn = MAPPINGS[Number(tmdbId)];
-  if (!fn) return { season, episode };
-  return fn({ season, episode });
+export function applyEpisodeMapping(tmdbId, season, episode, groupMap) {
+  if (!groupMap) return { season, episode };
+  const mapped = groupMap.get(`${season}_${episode}`);
+  if (!mapped) return { season, episode };
+  return mapped;
+}
+
+/**
+ * Build a lookup Map from a raw TMDB episode group API response.
+ * Key:   "tmdbSeason_tmdbEpisode"
+ * Value: { season, episode } for the streaming source
+ *
+ * @param {object} groupData  Raw response from /tv/episode_group/{id}
+ * @returns {Map}
+ */
+export function buildEpisodeGroupMap(groupData) {
+  const map = new Map();
+  if (!groupData?.groups) return map;
+
+  const sortedGroups = [...groupData.groups].sort((a, b) => a.order - b.order);
+  sortedGroups.forEach((group, groupIndex) => {
+    const sourceSeason = groupIndex + 1;
+    const sortedEpisodes = [...(group.episodes || [])].sort(
+      (a, b) => a.order - b.order,
+    );
+    sortedEpisodes.forEach((ep, epIndex) => {
+      map.set(`${ep.season_number}_${ep.episode_number}`, {
+        season: sourceSeason,
+        episode: epIndex + 1,
+      });
+    });
+  });
+
+  return map;
 }

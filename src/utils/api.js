@@ -60,7 +60,7 @@ export const tmdbFetch = async (path, apiKey) => {
   } finally {
     // releaseSlot is called in the catch above for network errors;
     // for successful responses it is called immediately below, before
-    // parsing. So the slot is held only during the actual in-flight
+    // parsing, so the slot is held only during the actual in-flight
     // request, not during res.json().
   }
 
@@ -360,3 +360,9 @@ export const isAnimeContent = (item, details) => {
 // Default sources
 export const ANIME_DEFAULT_SOURCE = "allmanga";
 export const NON_ANIME_DEFAULT_SOURCE = "videasy";
+
+// ── Episode Group fetch (for source-numbering corrections) ────────────────────
+// Uses the same in-memory TMDB cache as tmdbFetch.
+export const fetchEpisodeGroup = async (groupId, apiKey) => {
+  return tmdbFetch(`/tv/episode_group/${groupId}`, apiKey);
+};

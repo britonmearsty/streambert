@@ -1,5 +1,9 @@
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from "react";
-import { applyEpisodeMapping } from "../utils/episodeMappings";
+import {
+  EPISODE_GROUP_IDS,
+  applyEpisodeMapping,
+  buildEpisodeGroupMap,
+} from "../utils/episodeMappings";
 import {
   tmdbFetch,
   imgUrl,
@@ -8,6 +12,7 @@ import {
   sourceSupportsProgress,
   sourceIsAsync,
   fetchAnilistData,
+  fetchEpisodeGroup,
   buildAnilistSeasons,
   cleanAnilistDescription,
   isAnimeContent,
@@ -322,6 +327,8 @@ export default function TVPage({
   const [resolveError, setResolveError] = useState(null);
   const [anilistData, setAnilistData] = useState(null);
   const [anilistSeasons, setAnilistSeasons] = useState(null); // [{seasonNum, title, episodes, year}]
+  const [episodeGroupData, setEpisodeGroupData] = useState(null); // Raw TMDB episode group response
+  const [episodeGroupMap, setEpisodeGroupMap] = useState(null); // Map built from TMDB episode group
   // Webview loading overlay
   const [webviewLoading, setWebviewLoading] = useState(false);
   const [menuPos, setMenuPos] = useState(null);
@@ -394,6 +401,32 @@ export default function TVPage({
     };
   }, [item.id, apiKey]);
 
+  // ── Fetch episode group mapping if this show has one ─────────────────────
+  useEffect(() => {
+    const groupId = EPISODE_GROUP_IDS[Number(item.id)];
+    if (!groupId || !apiKey) {
+      setEpisodeGroupData(null);
+      setEpisodeGroupMap(null);
+      return;
+    }
+    let mounted = true;
+    fetchEpisodeGroup(groupId, apiKey)
+      .then((data) => {
+        if (!mounted) return;
+        setEpisodeGroupData(data);
+        setEpisodeGroupMap(buildEpisodeGroupMap(data));
+      })
+      .catch(() => {
+        if (mounted) {
+          setEpisodeGroupData(null);
+          setEpisodeGroupMap(null);
+        }
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [item.id, apiKey]);
+
   useEffect(() => {
     let mounted = true;
     tmdbFetch(`/tv/${item.id}/videos`, apiKey)
@@ -426,8 +459,13 @@ export default function TVPage({
     setLoadingSeason(true);
     setSelectedEp(null);
     setPlaying(false);
-    // When using AniList seasons on a TMDB single-season show, always fetch TMDB S1
-    // (all episodes live there); slicing into virtual seasons is done client-side.
+    // Episode-group mode: episodes come from the group response directly,
+    // no TMDB season fetch needed.
+    if (episodeGroupData) {
+      setLoadingSeason(false);
+      return;
+    }
+    // AniList virtual seasons on a single-season show: always fetch TMDB S1.
     const tmdbSeasonToFetch =
       isAnime && anilistSeasons?.length > 0 && tmdbSeasons.length <= 1
         ? 1
@@ -444,7 +482,7 @@ export default function TVPage({
     return () => {
       mounted = false;
     };
-  }, [item.id, selectedSeason, apiKey, anilistSeasons]);
+  }, [item.id, selectedSeason, apiKey, anilistSeasons, episodeGroupData]);
 
   // Reset m3u8 URL, subtitle URL and source menu whenever the series, episode, or source changes
   useEffect(() => {
@@ -576,7 +614,7 @@ export default function TVPage({
   const title = d.name || d.title;
   const year = (d.first_air_date || "").slice(0, 4);
 
-  // ── Season list: prefer AniList structure for anime ───────────────────────
+  // ── Season list: prefer episode-group > AniList > TMDB ──────────────────
   const tmdbSeasons = useMemo(
     () => (d.seasons || []).filter((s) => s.season_number > 0),
     [d.seasons],
@@ -589,19 +627,48 @@ export default function TVPage({
     [isAnime, anilistSeasons, tmdbSeasons],
   );
 
-  const seasons = useMemo(
-    () =>
-      useAnilistSeasons
-        ? anilistSeasons.map((s) => ({
-            season_number: s.seasonNum,
-            name: s.title || `Season ${s.seasonNum}`,
-            episode_count: s.episodes || 0,
-          }))
-        : tmdbSeasons,
-    [useAnilistSeasons, anilistSeasons, tmdbSeasons],
-  );
+  // Episode-group virtual seasons (highest priority, e.g. Netflix order)
+  const episodeGroupSeasons = useMemo(() => {
+    if (!episodeGroupData?.groups) return null;
+    return [...episodeGroupData.groups]
+      .sort((a, b) => a.order - b.order)
+      .map((g, i) => ({
+        season_number: i + 1,
+        name: g.name || `Season ${i + 1}`,
+        episode_count: (g.episodes || []).length,
+      }));
+  }, [episodeGroupData]);
 
-  // ── Episode slice ──────────────────────────────────────────────────────────
+  const seasons = useMemo(() => {
+    if (episodeGroupSeasons) return episodeGroupSeasons;
+    if (useAnilistSeasons)
+      return anilistSeasons.map((s) => ({
+        season_number: s.seasonNum,
+        name: s.title || `Season ${s.seasonNum}`,
+        episode_count: s.episodes || 0,
+      }));
+    return tmdbSeasons;
+  }, [episodeGroupSeasons, useAnilistSeasons, anilistSeasons, tmdbSeasons]);
+
+  // Episodes for the currently selected season from episode group
+  const episodeGroupCurrentEpisodes = useMemo(() => {
+    if (!episodeGroupData?.groups) return null;
+    const sortedGroups = [...episodeGroupData.groups].sort(
+      (a, b) => a.order - b.order,
+    );
+    const group = sortedGroups[selectedSeason - 1];
+    if (!group) return null;
+    return [...(group.episodes || [])]
+      .sort((a, b) => a.order - b.order)
+      .map((ep, i) => ({
+        ...ep,
+        episode_number: i + 1, // display number within this group-season
+        _tmdbSeason: ep.season_number, // real TMDB season for player mapping
+        _tmdbAbsolute: ep.episode_number, // real TMDB episode for player mapping
+      }));
+  }, [episodeGroupData, selectedSeason]);
+
+  // ── Episode slice (AniList virtual seasons only) ───────────────────────────
   const getSeasonEpisodes = useCallback(
     (rawEpisodes) => {
       if (!useAnilistSeasons || !rawEpisodes) return rawEpisodes;
@@ -625,15 +692,20 @@ export default function TVPage({
   // ── Player episode mapping
   const playerEp = useMemo(() => {
     if (!selectedEp) return { season: selectedSeason, episode: undefined };
-    const rawSeason = selectedSeason;
+    // In episode-group mode: use the real TMDB season/episode stored on the ep
+    const rawSeason = selectedEp._tmdbSeason ?? selectedSeason;
     const rawEpisode = selectedEp._tmdbAbsolute ?? selectedEp.episode_number;
-    return applyEpisodeMapping(item.id, rawSeason, rawEpisode);
-  }, [selectedEp, selectedSeason, item.id]);
+    return applyEpisodeMapping(item.id, rawSeason, rawEpisode, episodeGroupMap);
+  }, [selectedEp, selectedSeason, item.id, episodeGroupMap]);
 
   // ── Memoized current season episodes ──────────────────────────────────────
+  // Episode-group episodes take priority; fall back to TMDB season data
   const currentSeasonEpisodes = useMemo(
-    () => getSeasonEpisodes(seasonData?.episodes) || [],
-    [getSeasonEpisodes, seasonData],
+    () =>
+      episodeGroupCurrentEpisodes ||
+      getSeasonEpisodes(seasonData?.episodes) ||
+      [],
+    [episodeGroupCurrentEpisodes, getSeasonEpisodes, seasonData],
   );
 
   // ── Downloads lookup map: O(1) per episode instead of O(n) ───────────────
