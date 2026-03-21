@@ -187,6 +187,18 @@ function createWindow() {
   const trailerSession = session.fromPartition("persist:trailer");
   setupSession(videasySession, trailerSession);
 
+  // Force long-lived disk caching for TMDB images in the default session.
+  session.defaultSession.webRequest.onHeadersReceived(
+    { urls: ["*://image.tmdb.org/*"] },
+    (details, callback) => {
+      const headers = { ...details.responseHeaders };
+      headers["cache-control"] = ["public, max-age=604800, immutable"]; // 7 days
+      delete headers["pragma"];
+      delete headers["expires"];
+      callback({ responseHeaders: headers });
+    },
+  );
+
   // Block popups from webviews, intercept fullscreen
   mainWindow.webContents.on("did-attach-webview", (_, wc) => {
     wc.setWindowOpenHandler(() => ({ action: "deny" }));

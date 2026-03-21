@@ -2631,6 +2631,13 @@ export default function SettingsPage({ apiKey, onChangeApiKey }) {
 
   const handleClearCache = async () => {
     if (isElectron) await window.electron.clearAppCache();
+    // Clear localStorage caches (AniList, Episode Groups, video durations)
+    localStorage.removeItem("streambert_anilistCache");
+    localStorage.removeItem("streambert_episodeGroupCache");
+    // Clear persisted video duration keys (dlDur_*)
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith("dlDur_")) localStorage.removeItem(key);
+    }
     setSizes((prev) => ({ ...prev, cache: 0 }));
     return { msg: "✓ Cache cleared successfully" };
   };
@@ -2663,6 +2670,10 @@ export default function SettingsPage({ apiKey, onChangeApiKey }) {
     setShowResetConfirm(false);
     if (isElectron) await window.electron.resetApp();
     storage.clearAll();
+    // Clear non-prefixed localStorage caches
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith("dlDur_")) localStorage.removeItem(key);
+    }
     window.location.reload();
   };
 
