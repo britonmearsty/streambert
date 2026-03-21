@@ -361,8 +361,47 @@ export const isAnimeContent = (item, details) => {
 export const ANIME_DEFAULT_SOURCE = "allmanga";
 export const NON_ANIME_DEFAULT_SOURCE = "videasy";
 
-// ── Episode Group fetch (for source-numbering corrections) ────────────────────
-// Uses the same in-memory TMDB cache as tmdbFetch.
+// ── Episode Group fetch (localStorage + in-memory cache, 7-day TTL) ─────────
+// Episode groups almost never change, so we cache aggressively across sessions.
+const EG_CACHE_KEY = "streambert_episodeGroupCache";
+const EG_CACHE_TTL = 1000 * 60 * 60 * 24 * 7; // 7 days
+
+let _egCache = null;
+
+function getEgCache() {
+  if (_egCache) return _egCache;
+  try {
+    const raw = localStorage.getItem(EG_CACHE_KEY);
+    _egCache = raw ? JSON.parse(raw) : {};
+  } catch {
+    _egCache = {};
+  }
+  // Evict stale entries once on load
+  const now = Date.now();
+  for (const key of Object.keys(_egCache)) {
+    if (now - _egCache[key].ts > EG_CACHE_TTL) delete _egCache[key];
+  }
+  return _egCache;
+}
+
+let _egFlushTimer = null;
+function flushEgCache() {
+  if (_egFlushTimer) clearTimeout(_egFlushTimer);
+  _egFlushTimer = setTimeout(() => {
+    _egFlushTimer = null;
+    try {
+      localStorage.setItem(EG_CACHE_KEY, JSON.stringify(_egCache));
+    } catch {}
+  }, 500);
+}
+
 export const fetchEpisodeGroup = async (groupId, apiKey) => {
-  return tmdbFetch(`/tv/episode_group/${groupId}`, apiKey);
+  const cache = getEgCache();
+  const entry = cache[groupId];
+  if (entry && Date.now() - entry.ts <= EG_CACHE_TTL) return entry.data;
+
+  const data = await tmdbFetch(`/tv/episode_group/${groupId}`, apiKey);
+  cache[groupId] = { data, ts: Date.now() };
+  flushEgCache();
+  return data;
 };

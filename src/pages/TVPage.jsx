@@ -459,12 +459,6 @@ export default function TVPage({
     setLoadingSeason(true);
     setSelectedEp(null);
     setPlaying(false);
-    // Episode-group mode: episodes come from the group response directly,
-    // no TMDB season fetch needed.
-    if (episodeGroupData) {
-      setLoadingSeason(false);
-      return;
-    }
     // AniList virtual seasons on a single-season show: always fetch TMDB S1.
     const tmdbSeasonToFetch =
       isAnime && anilistSeasons?.length > 0 && tmdbSeasons.length <= 1
@@ -482,7 +476,7 @@ export default function TVPage({
     return () => {
       mounted = false;
     };
-  }, [item.id, selectedSeason, apiKey, anilistSeasons, episodeGroupData]);
+  }, [item.id, selectedSeason, apiKey, anilistSeasons]);
 
   // Reset m3u8 URL, subtitle URL and source menu whenever the series, episode, or source changes
   useEffect(() => {
@@ -699,13 +693,23 @@ export default function TVPage({
   }, [selectedEp, selectedSeason, item.id, episodeGroupMap]);
 
   // ── Memoized current season episodes ──────────────────────────────────────
-  // Episode-group episodes take priority; fall back to TMDB season data
+  // If this show has a known episode group but it hasn't loaded yet, return []
+  // to avoid a flash of wrong TMDB episodes before the group data arrives.
+  const episodeGroupPending =
+    !!EPISODE_GROUP_IDS[Number(item.id)] && !episodeGroupData;
   const currentSeasonEpisodes = useMemo(
     () =>
-      episodeGroupCurrentEpisodes ||
-      getSeasonEpisodes(seasonData?.episodes) ||
-      [],
-    [episodeGroupCurrentEpisodes, getSeasonEpisodes, seasonData],
+      episodeGroupPending
+        ? []
+        : episodeGroupCurrentEpisodes ||
+          getSeasonEpisodes(seasonData?.episodes) ||
+          [],
+    [
+      episodeGroupPending,
+      episodeGroupCurrentEpisodes,
+      getSeasonEpisodes,
+      seasonData,
+    ],
   );
 
   // ── Downloads lookup map: O(1) per episode instead of O(n) ───────────────
