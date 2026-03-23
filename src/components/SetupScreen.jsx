@@ -71,6 +71,21 @@ function errorMessage(reason, status) {
   }
 }
 
+function ExternalLink({ href, className, children }) {
+  return (
+    <a
+      className={className}
+      href={href}
+      onClick={(e) => {
+        e.preventDefault();
+        window.electron.openExternal(href);
+      }}
+    >
+      {children}
+    </a>
+  );
+}
+
 export default function SetupScreen({ onSave, onSkip }) {
   const [key, setKey] = useState("");
   const [checking, setChecking] = useState(false);
@@ -112,16 +127,21 @@ export default function SetupScreen({ onSave, onSkip }) {
           <strong>Read Access Token</strong> to get started.
           <br />
           Go to{" "}
-          <a
+          <ExternalLink
             className="apikey-link"
             href="https://www.themoviedb.org/settings/api"
-            target="_blank"
-            rel="noreferrer"
           >
             themoviedb.org → Settings → API
-          </a>{" "}
+          </ExternalLink>{" "}
           and copy the <em>API Read Access Token</em> (the long JWT, not the
           shorter API Key below).
+          <br />
+          <ExternalLink
+            className="apikey-link"
+            href="https://github.com/truelockmc/streambert/blob/main/tmdb-tutorial.md"
+          >
+            Step-by-step guide on how to get that Token
+          </ExternalLink>
         </p>
         <input
           className={`apikey-input${error ? " apikey-input-error" : ""}`}
