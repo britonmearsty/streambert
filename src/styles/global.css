@@ -1128,6 +1128,17 @@ body.no-anim *::after {
     color: #fff;
 }
 
+.season-btn.season-partial {
+    border-color: rgba(255, 183, 77, 0.45);
+    color: rgb(255, 183, 77);
+}
+
+.season-btn.season-partial.active {
+    background: var(--red);
+    border-color: var(--red);
+    color: #fff;
+}
+
 .season-watched-icon {
     margin-right: 4px;
     font-size: 11px;

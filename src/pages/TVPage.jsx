@@ -47,6 +47,55 @@ import {
   getRatingCountry,
 } from "../utils/ageRating";
 
+// ── Partial-circle progress icon (cached per pct tier) ───────────────────────
+// Uses a single SVG arc. Three instances (25/50/75)
+function _makePartialCircle(pct) {
+  const r = 5;
+  const cx = 7;
+  const cy = 7;
+  const angle = (pct / 100) * 2 * Math.PI - Math.PI / 2;
+  const x = cx + r * Math.cos(angle);
+  const y = cy + r * Math.sin(angle);
+  const large = pct > 50 ? 1 : 0;
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 14 14"
+      style={{
+        display: "inline-block",
+        verticalAlign: "middle",
+        marginRight: 4,
+        flexShrink: 0,
+      }}
+    >
+      {/* Background ring */}
+      <circle
+        cx={cx}
+        cy={cy}
+        r={r}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        opacity="0.25"
+      />
+      {/* Filled arc */}
+      <path
+        d={`M ${cx} ${cy - r} A ${r} ${r} 0 ${large} 1 ${x.toFixed(3)} ${y.toFixed(3)} L ${cx} ${cy} Z`}
+        fill="currentColor"
+        opacity="0.9"
+      />
+    </svg>
+  );
+}
+const _CIRCLE_25 = _makePartialCircle(25);
+const _CIRCLE_50 = _makePartialCircle(50);
+const _CIRCLE_75 = _makePartialCircle(75);
+const _CIRCLE_MAP = { 25: _CIRCLE_25, 50: _CIRCLE_50, 75: _CIRCLE_75 };
+function PartialCircleIcon({ pct }) {
+  return _CIRCLE_MAP[pct] ?? null;
+}
+
 // Generic context menu (used for both episode and season actions)
 function ContextMenu({
   x,
@@ -786,8 +835,8 @@ export default function TVPage({
   );
 
   // ── Season watched helpers ─────────────────────────────────────────────────
-  // Memoized map: seasonNum → boolean. Recomputed only when watched/seasons change,
-  // not on every render from the 5s progress interval.
+  // Memoized map: seasonNum → "all" | "some" | "none"
+  // Recomputed only when watched/seasons change, not on every render.
   const seasonWatchedMap = useMemo(() => {
     const map = {};
     for (const s of seasons) {
@@ -797,23 +846,27 @@ export default function TVPage({
           ? currentSeasonEpisodes.length || s.episode_count || 0
           : s.episode_count || 0;
       if (!count) {
-        map[num] = false;
+        map[num] = "none";
         continue;
       }
-      let allWatched = true;
+      let watchedCount = 0;
       for (let i = 1; i <= count; i++) {
-        if (!watched?.[`tv_${item.id}_s${num}e${i}`]) {
-          allWatched = false;
-          break;
-        }
+        if (watched?.[`tv_${item.id}_s${num}e${i}`]) watchedCount++;
       }
-      map[num] = allWatched;
+      if (watchedCount === 0) {
+        map[num] = "none";
+      } else if (watchedCount === count) {
+        map[num] = "all";
+      } else {
+        const pct = watchedCount / count;
+        map[num] = pct < 0.375 ? "some25" : pct < 0.625 ? "some50" : "some75";
+      }
     }
     return map;
   }, [seasons, selectedSeason, currentSeasonEpisodes, watched, item.id]);
 
   const isSeasonWatched = useCallback(
-    (seasonNum) => seasonWatchedMap[seasonNum] ?? false,
+    (seasonNum) => seasonWatchedMap[seasonNum] === "all",
     [seasonWatchedMap],
   );
 
@@ -1496,11 +1549,11 @@ export default function TVPage({
             {seasons.length > 0 && (
               <div className="season-selector">
                 {seasons.map((s) => {
-                  const sw = isSeasonWatched(s.season_number);
+                  const sw = seasonWatchedMap[s.season_number] ?? "none";
                   return (
                     <button
                       key={s.season_number}
-                      className={`season-btn ${selectedSeason === s.season_number ? "active" : ""} ${sw ? "season-watched" : ""}`}
+                      className={`season-btn ${selectedSeason === s.season_number ? "active" : ""} ${sw === "all" ? "season-watched" : sw.startsWith("some") ? "season-partial" : ""}`}
                       onClick={() => setSelectedSeason(s.season_number)}
                       onContextMenu={(e) => {
                         e.preventDefault();
@@ -1513,7 +1566,12 @@ export default function TVPage({
                       }}
                       title="Right-click to mark season as watched/unwatched"
                     >
-                      {sw && <span className="season-watched-icon">✓</span>}
+                      {sw === "all" && (
+                        <span className="season-watched-icon">✓</span>
+                      )}
+                      {sw === "some25" && <PartialCircleIcon pct={25} />}
+                      {sw === "some50" && <PartialCircleIcon pct={50} />}
+                      {sw === "some75" && <PartialCircleIcon pct={75} />}
                       Season {s.season_number}
                     </button>
                   );
