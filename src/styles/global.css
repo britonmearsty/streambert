@@ -1043,6 +1043,18 @@ body.no-anim *::after {
     color: var(--text);
 }
 
+.season-btn.season-watched:hover {
+    border-color: rgba(72, 199, 116, 0.9);
+    color: rgb(72, 199, 116);
+    box-shadow: 0 0 0 3px rgba(72, 199, 116, 0.15);
+}
+
+.season-btn.season-partial:hover {
+    border-color: rgba(255, 183, 77, 0.9);
+    color: rgb(255, 183, 77);
+    box-shadow: 0 0 0 3px rgba(255, 183, 77, 0.15);
+}
+
 .season-btn.active {
     background: var(--red);
     border-color: var(--red);
