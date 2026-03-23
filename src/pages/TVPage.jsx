@@ -741,6 +741,20 @@ export default function TVPage({
   }, [downloads, item.id]);
 
   // Prefer AniList metadata for anime when available
+  const displaySeasonCount = useMemo(
+    () => (anilistLoading ? null : seasons.length || d.number_of_seasons || 0),
+    [anilistLoading, seasons, d.number_of_seasons],
+  );
+  const displayEpisodeCount = useMemo(
+    () =>
+      anilistLoading
+        ? null
+        : useAnilistSeasons
+          ? anilistSeasons.reduce((sum, s) => sum + (s.episodes || 0), 0)
+          : d.number_of_episodes || 0,
+    [anilistLoading, useAnilistSeasons, anilistSeasons, d.number_of_episodes],
+  );
+
   const displayOverview = useMemo(
     () =>
       anilistLoading
@@ -1115,32 +1129,18 @@ export default function TVPage({
                     </span>
                   )}
                   {year && <span>{year}</span>}
-                  {!anilistLoading &&
-                    (() => {
-                      const seasonCount =
-                        seasons.length || d.number_of_seasons || 0;
-                      const episodeCount = useAnilistSeasons
-                        ? anilistSeasons.reduce(
-                            (sum, s) => sum + (s.episodes || 0),
-                            0,
-                          )
-                        : d.number_of_episodes || 0;
-                      return (
-                        <>
-                          {seasonCount > 0 && (
-                            <span>
-                              {seasonCount} Season{seasonCount !== 1 ? "s" : ""}
-                            </span>
-                          )}
-                          {episodeCount > 0 && (
-                            <span>
-                              {episodeCount} Episode
-                              {episodeCount !== 1 ? "s" : ""}
-                            </span>
-                          )}
-                        </>
-                      );
-                    })()}
+                  {displaySeasonCount > 0 && (
+                    <span>
+                      {displaySeasonCount} Season
+                      {displaySeasonCount !== 1 ? "s" : ""}
+                    </span>
+                  )}
+                  {displayEpisodeCount > 0 && (
+                    <span>
+                      {displayEpisodeCount} Episode
+                      {displayEpisodeCount !== 1 ? "s" : ""}
+                    </span>
+                  )}
                 </div>
                 {rating.cert && (
                   <div
