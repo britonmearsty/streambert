@@ -327,6 +327,7 @@ export default function TVPage({
   const [resolveError, setResolveError] = useState(null);
   const [anilistData, setAnilistData] = useState(null);
   const [anilistSeasons, setAnilistSeasons] = useState(null); // [{seasonNum, title, episodes, year}]
+  const [anilistLoading, setAnilistLoading] = useState(false);
   const [episodeGroupData, setEpisodeGroupData] = useState(null); // Raw TMDB episode group response
   const [episodeGroupMap, setEpisodeGroupMap] = useState(null); // Map built from TMDB episode group
   // Webview loading overlay
@@ -501,14 +502,20 @@ export default function TVPage({
     setAnilistData(null);
     setAnilistSeasons(null);
     if (isAnime) {
-      fetchAnilistData(item.name || item.title, "ANIME", item.id).then(
-        (data) => {
-          if (!mounted || !data) return;
-          setAnilistData(data);
-          const seasons = buildAnilistSeasons(data);
-          if (seasons?.length) setAnilistSeasons(seasons);
-        },
-      );
+      setAnilistLoading(true);
+      fetchAnilistData(item.name || item.title, "ANIME", item.id)
+        .then((data) => {
+          if (!mounted) return;
+          if (data) {
+            setAnilistData(data);
+            const seasons = buildAnilistSeasons(data);
+            if (seasons?.length) setAnilistSeasons(seasons);
+          }
+          if (mounted) setAnilistLoading(false);
+        })
+        .catch(() => {
+          if (mounted) setAnilistLoading(false);
+        });
       // Switch to anime source if current source is not an anime source
       const currentSrc = PLAYER_SOURCES.find((s) => s.id === playerSource);
       if (!currentSrc?.tag) {
@@ -517,6 +524,7 @@ export default function TVPage({
         setPlayerSource(savedSrc?.tag ? saved : ANIME_DEFAULT_SOURCE);
       }
     } else {
+      setAnilistLoading(false);
       // Switch back to non-anime source if current source is anime-only
       const currentSrc = PLAYER_SOURCES.find((s) => s.id === playerSource);
       if (currentSrc?.tag) {
@@ -693,26 +701,27 @@ export default function TVPage({
   }, [selectedEp, selectedSeason, item.id, episodeGroupMap]);
 
   // ── Memoized current season episodes ──────────────────────────────────────
-  // If this show has a known episode group but it hasn't loaded yet, return []
-  // to avoid a flash of wrong TMDB episodes before the group data arrives.
+  // While episode group or AniList data is still loading, return [] to prevent
+  // a flash of wrong TMDB episodes before the correct data arrives.
   const episodeGroupPending = useMemo(
     () => !!EPISODE_GROUP_IDS[Number(item.id)] && !episodeGroupData,
     [item.id, episodeGroupData],
   );
-  const currentSeasonEpisodes = useMemo(
-    () =>
-      episodeGroupPending
-        ? []
-        : episodeGroupCurrentEpisodes ||
-          getSeasonEpisodes(seasonData?.episodes) ||
-          [],
-    [
-      episodeGroupPending,
-      episodeGroupCurrentEpisodes,
-      getSeasonEpisodes,
-      seasonData,
-    ],
-  );
+  const currentSeasonEpisodes = useMemo(() => {
+    if (episodeGroupPending) return [];
+    if (anilistLoading) return [];
+    return (
+      episodeGroupCurrentEpisodes ||
+      getSeasonEpisodes(seasonData?.episodes) ||
+      []
+    );
+  }, [
+    episodeGroupPending,
+    anilistLoading,
+    episodeGroupCurrentEpisodes,
+    getSeasonEpisodes,
+    seasonData,
+  ]);
 
   // ── Downloads lookup map: O(1) per episode instead of O(n) ───────────────
   const downloadsByEpisodeKey = useMemo(() => {
@@ -734,26 +743,32 @@ export default function TVPage({
   // Prefer AniList metadata for anime when available
   const displayOverview = useMemo(
     () =>
-      isAnime && anilistData?.description
-        ? cleanAnilistDescription(anilistData.description)
-        : d.overview,
-    [isAnime, anilistData?.description, d.overview],
+      anilistLoading
+        ? null
+        : isAnime && anilistData?.description
+          ? cleanAnilistDescription(anilistData.description)
+          : d.overview,
+    [anilistLoading, isAnime, anilistData?.description, d.overview],
   );
   const displayScore = useMemo(
     () =>
-      isAnime && anilistData?.averageScore
-        ? (anilistData.averageScore / 10).toFixed(1)
-        : d.vote_average > 0
-          ? d.vote_average.toFixed(1)
-          : null,
-    [isAnime, anilistData?.averageScore, d.vote_average],
+      anilistLoading
+        ? null
+        : isAnime && anilistData?.averageScore
+          ? (anilistData.averageScore / 10).toFixed(1)
+          : d.vote_average > 0
+            ? d.vote_average.toFixed(1)
+            : null,
+    [anilistLoading, isAnime, anilistData?.averageScore, d.vote_average],
   );
   const displayGenres = useMemo(
     () =>
-      isAnime && anilistData?.genres?.length
-        ? anilistData.genres.map((g, i) => ({ id: i, name: g }))
-        : d.genres || [],
-    [isAnime, anilistData?.genres, d.genres],
+      anilistLoading
+        ? []
+        : isAnime && anilistData?.genres?.length
+          ? anilistData.genres.map((g, i) => ({ id: i, name: g }))
+          : d.genres || [],
+    [anilistLoading, isAnime, anilistData?.genres, d.genres],
   );
 
   // ── Season watched helpers ─────────────────────────────────────────────────
@@ -1100,12 +1115,32 @@ export default function TVPage({
                     </span>
                   )}
                   {year && <span>{year}</span>}
-                  {d.number_of_seasons && (
-                    <span>{d.number_of_seasons} Seasons</span>
-                  )}
-                  {d.number_of_episodes && (
-                    <span>{d.number_of_episodes} Episodes</span>
-                  )}
+                  {!anilistLoading &&
+                    (() => {
+                      const seasonCount =
+                        seasons.length || d.number_of_seasons || 0;
+                      const episodeCount = useAnilistSeasons
+                        ? anilistSeasons.reduce(
+                            (sum, s) => sum + (s.episodes || 0),
+                            0,
+                          )
+                        : d.number_of_episodes || 0;
+                      return (
+                        <>
+                          {seasonCount > 0 && (
+                            <span>
+                              {seasonCount} Season{seasonCount !== 1 ? "s" : ""}
+                            </span>
+                          )}
+                          {episodeCount > 0 && (
+                            <span>
+                              {episodeCount} Episode
+                              {episodeCount !== 1 ? "s" : ""}
+                            </span>
+                          )}
+                        </>
+                      );
+                    })()}
                 </div>
                 {rating.cert && (
                   <div
