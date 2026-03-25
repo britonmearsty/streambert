@@ -108,7 +108,8 @@ export const PLAYER_SOURCES = [
     label: "VidSrc",
     tag: null,
     note: null,
-    supportsProgress: false,
+    supportsProgress: true,
+    progressViaFrames: true, // video is in a nested iframe, needs main-process frame query
     movieUrl: (id) => `https://vidsrc.to/embed/movie/${id}`,
     tvUrl: (id, season, ep) =>
       `https://vidsrc.to/embed/tv/${id}/${season}/${ep}`,
@@ -118,7 +119,8 @@ export const PLAYER_SOURCES = [
     label: "2Embed",
     tag: null,
     note: null,
-    supportsProgress: false,
+    supportsProgress: true,
+    progressViaFrames: true,
     movieUrl: (id) => `https://www.2embed.online/embed/movie/${id}`,
     tvUrl: (id, season, ep) =>
       `https://www.2embed.online/embed/tv/${id}/${season}/${ep}`,
@@ -143,6 +145,9 @@ export const getSourceUrl = (sourceId, type, id, season, ep, _title) => {
 
 export const sourceSupportsProgress = (sourceId) =>
   PLAYER_SOURCES.find((s) => s.id === sourceId)?.supportsProgress ?? false;
+
+export const sourceProgressViaFrames = (sourceId) =>
+  PLAYER_SOURCES.find((s) => s.id === sourceId)?.progressViaFrames ?? false;
 
 export const sourceIsAsync = (sourceId) =>
   PLAYER_SOURCES.find((s) => s.id === sourceId)?.async ?? false;

@@ -10,6 +10,7 @@ import {
   PLAYER_SOURCES,
   getSourceUrl,
   sourceSupportsProgress,
+  sourceProgressViaFrames,
   sourceIsAsync,
   fetchAnilistData,
   fetchEpisodeGroup,
@@ -361,6 +362,10 @@ export default function TVPage({
   const isAsync = useMemo(() => sourceIsAsync(playerSource), [playerSource]);
   const supportsProgress = useMemo(
     () => sourceSupportsProgress(playerSource),
+    [playerSource],
+  );
+  const progressViaFrames = useMemo(
+    () => sourceProgressViaFrames(playerSource),
     [playerSource],
   );
   const currentSourceLabel = useMemo(
@@ -948,26 +953,34 @@ export default function TVPage({
         try {
           const wv = webviewRef.current;
           if (!wv) return;
-          const result = await wv.executeJavaScript(`
-            (() => {
-              const v = document.querySelector('video')
-              if (!v || !v.duration || v.duration === Infinity || v.paused) return null
-              // Re-attach seek tracker if video element was recreated (e.g. quality change)
-              if (!v._seekTracked) {
-                v._seekTracked = true
-                v.addEventListener('seeked', () => {
-                  v._lastUserSeek = Date.now()
-                  v._lastUserSeekTo = v.currentTime
-                })
-              }
-              return {
-                currentTime: v.currentTime,
-                duration: v.duration,
-                recentUserSeek: v._lastUserSeek ? (Date.now() - v._lastUserSeek < 6000) : false,
-                lastUserSeekTo: v._lastUserSeekTo ?? null,
-              }
-            })()
-          `);
+
+          let result;
+          if (progressViaFrames && window.electron?.queryVideoProgress) {
+            result = await window.electron.queryVideoProgress(
+              wv.getWebContentsId(),
+            );
+          } else {
+            result = await wv.executeJavaScript(`
+              (() => {
+                const v = document.querySelector('video')
+                if (!v || !v.duration || v.duration === Infinity || v.paused) return null
+                // Re-attach seek tracker if video element was recreated (e.g. quality change)
+                if (!v._seekTracked) {
+                  v._seekTracked = true
+                  v.addEventListener('seeked', () => {
+                    v._lastUserSeek = Date.now()
+                    v._lastUserSeekTo = v.currentTime
+                  })
+                }
+                return {
+                  currentTime: v.currentTime,
+                  duration: v.duration,
+                  recentUserSeek: v._lastUserSeek ? (Date.now() - v._lastUserSeek < 6000) : false,
+                  lastUserSeekTo: v._lastUserSeekTo ?? null,
+                }
+              })()
+            `);
+          }
           if (result && result.duration > 0) {
             const ct = result.currentTime;
 
@@ -1028,7 +1041,13 @@ export default function TVPage({
       clearTimeout(timer);
       clearInterval(interval);
     };
-  }, [playing, currentProgressKey, watchedThreshold, playerSource]);
+  }, [
+    playing,
+    currentProgressKey,
+    watchedThreshold,
+    playerSource,
+    progressViaFrames,
+  ]);
 
   // Skip backward/forward by N seconds via webview JS injection
   const seekBy = useCallback(async (seconds) => {

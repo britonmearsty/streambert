@@ -340,6 +340,56 @@ function register(getMainWindow, { writeSecretMigration }) {
   ipcMain.handle("cancel-update", () => {
     _updateAbortController?.abort();
   });
+
+  // ── Query video progress across all webview frames ────────────────────────
+  // executeJavaScript on a webview only reaches the top frame.
+  // VidSrc / 2embed nest the player inside cross-origin iframes, so we iterate
+  // all frames from the main process where same-origin restrictions don't apply.
+  ipcMain.handle("query-video-progress", async (_, webContentsId) => {
+    try {
+      const { webContents } = require("electron");
+      const wc = webContents.fromId(webContentsId);
+      if (!wc || wc.isDestroyed()) return null;
+
+      // Recursively collect all frames
+      const allFrames = [];
+      const collect = (frame) => {
+        allFrames.push(frame);
+        for (const child of frame.frames || []) collect(child);
+      };
+      collect(wc.mainFrame);
+
+      const JS = `
+        (() => {
+          const v = document.querySelector('video');
+          if (!v || !v.duration || v.duration === Infinity || v.paused) return null;
+          if (!v._seekTracked) {
+            v._seekTracked = true;
+            v.addEventListener('seeked', () => {
+              v._lastUserSeek = Date.now();
+              v._lastUserSeekTo = v.currentTime;
+            });
+          }
+          return {
+            currentTime: v.currentTime,
+            duration: v.duration,
+            recentUserSeek: v._lastUserSeek ? (Date.now() - v._lastUserSeek < 6000) : false,
+            lastUserSeekTo: v._lastUserSeekTo ?? null,
+          };
+        })()
+      `;
+
+      for (const frame of allFrames) {
+        try {
+          const result = await frame.executeJavaScript(JS);
+          if (result && result.duration > 0) return result;
+        } catch {}
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  });
 }
 
 module.exports = { register };

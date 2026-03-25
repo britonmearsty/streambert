@@ -5,6 +5,7 @@ import {
   PLAYER_SOURCES,
   getSourceUrl,
   sourceSupportsProgress,
+  sourceProgressViaFrames,
   sourceIsAsync,
   fetchAnilistData,
   cleanAnilistDescription,
@@ -68,6 +69,10 @@ export default function MoviePage({
   const [interceptedSubs, setInterceptedSubs] = useState([]);
   const [playerSource, setPlayerSource] = useState(
     () => storage.get("playerSource") || "videasy",
+  );
+  const progressViaFrames = useMemo(
+    () => sourceProgressViaFrames(playerSource),
+    [playerSource],
   );
   const [showSourceMenu, setShowSourceMenu] = useState(false);
   const [dubMode, setDubMode] = useState(
@@ -345,26 +350,33 @@ export default function MoviePage({
         try {
           const wv = webviewRef.current;
           if (!wv) return;
-          const result = await wv.executeJavaScript(`
-            (() => {
-              const v = document.querySelector('video')
-              if (!v || !v.duration || v.duration === Infinity || v.paused) return null
-              // Re-attach seek tracker if video element was recreated (e.g. quality change)
-              if (!v._seekTracked) {
-                v._seekTracked = true
-                v.addEventListener('seeked', () => {
-                  v._lastUserSeek = Date.now()
-                  v._lastUserSeekTo = v.currentTime
-                })
-              }
-              return {
-                currentTime: v.currentTime,
-                duration: v.duration,
-                recentUserSeek: v._lastUserSeek ? (Date.now() - v._lastUserSeek < 6000) : false,
-                lastUserSeekTo: v._lastUserSeekTo ?? null,
-              }
-            })()
-          `);
+          let result;
+          if (progressViaFrames && window.electron?.queryVideoProgress) {
+            result = await window.electron.queryVideoProgress(
+              wv.getWebContentsId(),
+            );
+          } else {
+            result = await wv.executeJavaScript(`
+              (() => {
+                const v = document.querySelector('video')
+                if (!v || !v.duration || v.duration === Infinity || v.paused) return null
+                // Re-attach seek tracker if video element was recreated (e.g. quality change)
+                if (!v._seekTracked) {
+                  v._seekTracked = true
+                  v.addEventListener('seeked', () => {
+                    v._lastUserSeek = Date.now()
+                    v._lastUserSeekTo = v.currentTime
+                  })
+                }
+                return {
+                  currentTime: v.currentTime,
+                  duration: v.duration,
+                  recentUserSeek: v._lastUserSeek ? (Date.now() - v._lastUserSeek < 6000) : false,
+                  lastUserSeekTo: v._lastUserSeekTo ?? null,
+                }
+              })()
+            `);
+          }
           if (result && result.duration > 0) {
             const ct = result.currentTime;
 
@@ -425,7 +437,7 @@ export default function MoviePage({
       clearTimeout(timer);
       clearInterval(interval);
     };
-  }, [playing, progressKey, watchedThreshold, playerSource]);
+  }, [playing, progressKey, watchedThreshold, playerSource, progressViaFrames]);
 
   // ── Derived display values (must be declared before any callbacks that use them) ──
   const d = details || item;
