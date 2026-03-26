@@ -675,6 +675,49 @@ export default function MoviePage({
         </div>
       </div>
 
+      {!playing &&
+        !isWatched &&
+        (() => {
+          const watchedSecs = storage.get("dlTime_" + progressKey) || 0;
+          // Use live pct if available, else derive from stored seconds + runtime
+          const totalSecs = d.runtime ? d.runtime * 60 : 0;
+          const derivedPct =
+            watchedSecs > 0 && totalSecs > 0
+              ? Math.floor((watchedSecs / totalSecs) * 100)
+              : 0;
+          const displayPct = pct > 0 ? pct : derivedPct;
+          if (!displayPct) return null;
+          const fmt = (s) => {
+            const h = Math.floor(s / 3600);
+            const m = Math.floor((s % 3600) / 60);
+            const sec = Math.floor(s % 60);
+            return h > 0
+              ? `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`
+              : `${m}:${String(sec).padStart(2, "0")}`;
+          };
+          const label =
+            watchedSecs > 0 && totalSecs > 0
+              ? `${fmt(watchedSecs)} / ${fmt(totalSecs)}`
+              : watchedSecs > 0
+                ? fmt(watchedSecs)
+                : `${displayPct}%`;
+          return (
+            <div className="section">
+              <div className="progress-bar-row">
+                <div className="progress-bar-outer">
+                  <div
+                    className="progress-bar-fill"
+                    style={{ width: `${Math.min(displayPct, 100)}%` }}
+                  />
+                </div>
+                <span style={{ fontSize: 12, color: "var(--text3)" }}>
+                  {label}
+                </span>
+              </div>
+            </div>
+          );
+        })()}
+
       {playing && !restricted && !isUnreleased && (
         <div className="section">
           <div className="player-wrap" ref={playerWrapRef}>
