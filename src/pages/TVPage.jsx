@@ -102,10 +102,12 @@ function ContextMenu({
   x,
   y,
   isWatched,
+  hasProgress,
   watchedLabel,
   unwatchedLabel,
   onMarkWatched,
   onMarkUnwatched,
+  onMarkNotStarted,
   onClose,
 }) {
   const onCloseRef = useRef(onClose);
@@ -146,6 +148,18 @@ function ContextMenu({
           }}
         >
           ✓ {watchedLabel}
+        </button>
+      )}
+      {onMarkNotStarted && !isWatched && hasProgress && (
+        <button
+          className="context-menu-item"
+          onClick={(e) => {
+            e.stopPropagation();
+            onMarkNotStarted();
+            onCloseRef.current();
+          }}
+        >
+          ⊘ Mark as Not Started
         </button>
       )}
     </div>
@@ -1643,10 +1657,16 @@ export default function TVPage({
           x={epMenu.x}
           y={epMenu.y}
           isWatched={!!watched?.[epMenu.pk]}
+          hasProgress={(progress?.[epMenu.pk] ?? 0) > 0}
           watchedLabel="Mark as Watched"
           unwatchedLabel="Mark as Unwatched"
           onMarkWatched={() => onMarkWatched?.(epMenu.pk)}
           onMarkUnwatched={() => onMarkUnwatched?.(epMenu.pk)}
+          onMarkNotStarted={() => {
+            onMarkUnwatched?.(epMenu.pk);
+            saveProgress?.(epMenu.pk, 0);
+            storage.set("dlTime_" + epMenu.pk, null);
+          }}
           onClose={() => setEpMenu(null)}
         />
       )}

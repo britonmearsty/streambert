@@ -123,6 +123,7 @@ export default function MoviePage({
   const progressKey = `movie_${item.id}`;
   const pct = progress[progressKey] || 0;
   const isWatched = !!watched?.[progressKey];
+  const hasProgress = pct > 0;
 
   // Read threshold from settings (default 20s), stable across renders
   const [watchedThreshold] = useState(
@@ -645,12 +646,26 @@ export default function MoviePage({
                     <WatchedIcon size={16} /> Watched
                   </button>
                 ) : (
-                  <button
-                    className="btn btn-ghost"
-                    onClick={() => onMarkWatched?.(progressKey)}
-                  >
-                    ✓ Mark Watched
-                  </button>
+                  <>
+                    <button
+                      className="btn btn-ghost"
+                      onClick={() => onMarkWatched?.(progressKey)}
+                    >
+                      ✓ Mark Watched
+                    </button>
+                    {hasProgress && (
+                      <button
+                        className="btn btn-ghost"
+                        style={{ fontSize: 13 }}
+                        onClick={() => {
+                          saveProgress(progressKey, 0);
+                          storage.set("dlTime_" + progressKey, null);
+                        }}
+                      >
+                        ⊘ Not Started
+                      </button>
+                    )}
+                  </>
                 ))}
               <button className="btn btn-ghost" onClick={onBack}>
                 <BackIcon /> Back
