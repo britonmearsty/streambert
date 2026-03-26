@@ -125,6 +125,12 @@ export default function MoviePage({
   const isWatched = !!watched?.[progressKey];
   const hasProgress = pct > 0;
 
+  // ── Derived display values (must be declared before any callbacks that use them) ──
+  const d = details || item;
+  const title = d.title || d.name;
+  const year = (d.release_date || "").slice(0, 4);
+  const mediaName = `${title}${year ? " (" + year + ")" : ""}`;
+
   const { watchedSecs, totalSecs, displayPct, progressLabel } = useMemo(() => {
     const watchedSecs = storage.get("dlTime_" + progressKey) || 0;
     const totalSecs = d?.runtime ? d.runtime * 60 : 0;
@@ -466,12 +472,6 @@ export default function MoviePage({
       clearInterval(interval);
     };
   }, [playing, progressKey, watchedThreshold, playerSource, progressViaFrames]);
-
-  // ── Derived display values (must be declared before any callbacks that use them) ──
-  const d = details || item;
-  const title = d.title || d.name;
-  const year = (d.release_date || "").slice(0, 4);
-  const mediaName = `${title}${year ? " (" + year + ")" : ""}`;
 
   const handlePlay = useCallback(() => {
     setM3u8Url(null);
