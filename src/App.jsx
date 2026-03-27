@@ -89,8 +89,7 @@ export default function App() {
   // ── Startup: new-episode notification check ──────────────────────────────
   // Only runs once the API key has been loaded from secure storage (i.e. the
   // app is fully started and past the setup screen). Shows an in-app status
-  // pill while checking, then either a result card or a brief "nothing new"
-  // message.
+  // pill while checking, then either a result card or a brief "nothing new" message.
   useEffect(() => {
     if (!apiKeyLoaded) return;
     if (!storage.get(STORAGE_KEYS.NOTIFY_NEW_EPISODE)) return;
@@ -102,11 +101,9 @@ export default function App() {
       await new Promise((r) => setTimeout(r, 1200));
       if (cancelled) return;
 
-      const key = await secureStorage.get("apikey");
-      if (!key || cancelled) return;
+      if (!apiKey || cancelled) return;
 
-      const savedMap = storage.get("saved") || {};
-      const tvSeries = Object.values(savedMap).filter(
+      const tvSeries = Object.values(saved).filter(
         (item) => item && item.media_type === "tv" && item.id,
       );
       if (!tvSeries.length) return;
@@ -121,9 +118,6 @@ export default function App() {
         (s) => !cache[s.id] || now - (cache[s.id].checkedAt || 0) > CACHE_TTL,
       );
 
-      // Always show the loading pill (even if everything is cached)
-      setEpisodeCheckStatus("checking");
-
       if (!toCheck.length) {
         setEpisodeCheckStatus("none");
         episodeDismissTimerRef.current = setTimeout(() => {
@@ -131,6 +125,9 @@ export default function App() {
         }, 2000);
         return;
       }
+
+      // Only show loading pill when there's actually something to check
+      setEpisodeCheckStatus("checking");
 
       const BATCH = 3;
       // Each entry: { title, season, id, seriesItem }
@@ -141,7 +138,7 @@ export default function App() {
         await Promise.all(
           batch.map(async (series) => {
             try {
-              const data = await tmdbFetch(`/tv/${series.id}`, key);
+              const data = await tmdbFetch(`/tv/${series.id}`, apiKey);
               if (cancelled) return;
 
               const prev = cache[series.id] || {};
@@ -243,6 +240,7 @@ export default function App() {
     });
     return () => {
       cancelled = true;
+      clearTimeout(episodeDismissTimerRef.current);
     };
   }, [apiKeyLoaded]);
 
@@ -546,6 +544,11 @@ export default function App() {
     toastTimerRef.current = setTimeout(() => setToast(null), 2500);
   }, []);
 
+  const getMediaType = useCallback(
+    (item) => item.media_type || (item.first_air_date ? "tv" : "movie"),
+    [],
+  );
+
   const handleSelectResult = useCallback(
     (item) => {
       navigate(item.media_type === "tv" ? "tv" : "movie", item);
@@ -573,7 +576,8 @@ export default function App() {
 
   const toggleSave = useCallback(
     (item) => {
-      const id = `${item.media_type || (item.first_air_date ? "tv" : "movie")}_${item.id}`;
+      const mt = getMediaType(item);
+      const id = `${mt}_${item.id}`;
       const currentSaved = savedRef.current;
       const isRemoving = !!currentSaved[id];
       const next = { ...currentSaved };
@@ -592,7 +596,7 @@ export default function App() {
           id: item.id,
           title: item.title || item.name,
           poster_path: item.poster_path,
-          media_type: item.media_type || (item.first_air_date ? "tv" : "movie"),
+          media_type: mt,
           vote_average: item.vote_average,
           year: (item.release_date || item.first_air_date || "").slice(0, 4),
         };
@@ -607,15 +611,15 @@ export default function App() {
       setSaved(next);
       storage.set("saved", next);
     },
-    [showToast],
+    [showToast, getMediaType],
   );
 
   const isSaved = useCallback(
     (item) => {
-      const id = `${item.media_type || (item.first_air_date ? "tv" : "movie")}_${item.id}`;
+      const id = `${getMediaType(item)}_${item.id}`;
       return !!saved[id];
     },
-    [saved],
+    [saved, getMediaType],
   );
 
   const addHistory = useCallback((item) => {
@@ -626,7 +630,7 @@ export default function App() {
       id: item.id,
       title: item.title || item.name,
       poster_path: item.poster_path,
-      media_type: item.media_type || (item.first_air_date ? "tv" : "movie"),
+      media_type: getMediaType(item),
       watchedAt: Date.now(),
       // Store as numbers so the progress key always matches exactly
       season: item.season != null ? Number(item.season) : null,
@@ -1119,7 +1123,7 @@ export default function App() {
                             flexShrink: 0,
                           }}
                         >
-                          Staffel {entry.season}
+                          Season {entry.season}
                         </span>
                       )}
                     </li>
