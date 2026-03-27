@@ -50,6 +50,9 @@ export default function App() {
   const [toast, setToast] = useState(null);
   const [updateBanner, setUpdateBanner] = useState(null);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
+  // null | "checking" | { entries: object[] } | "none"
+  const [episodeCheckStatus, setEpisodeCheckStatus] = useState(null);
+  const episodeDismissTimerRef = useRef(null);
 
   const [trending, setTrending] = useState([]);
   const [trendingTV, setTrendingTV] = useState([]);
@@ -82,6 +85,166 @@ export default function App() {
       .catch(() => {}); // silently ignore network errors on startup
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ── Startup: new-episode notification check ──────────────────────────────
+  // Only runs once the API key has been loaded from secure storage (i.e. the
+  // app is fully started and past the setup screen). Shows an in-app status
+  // pill while checking, then either a result card or a brief "nothing new"
+  // message.
+  useEffect(() => {
+    if (!apiKeyLoaded) return;
+    if (!storage.get(STORAGE_KEYS.NOTIFY_NEW_EPISODE)) return;
+
+    let cancelled = false;
+
+    async function checkNewEpisodes() {
+      // Small grace period so the UI has fully painted before we start
+      await new Promise((r) => setTimeout(r, 1200));
+      if (cancelled) return;
+
+      const key = await secureStorage.get("apikey");
+      if (!key || cancelled) return;
+
+      const savedMap = storage.get("saved") || {};
+      const tvSeries = Object.values(savedMap).filter(
+        (item) => item && item.media_type === "tv" && item.id,
+      );
+      if (!tvSeries.length) return;
+
+      // Only re-check entries older than 12 h
+      const cache = storage.get(STORAGE_KEYS.EPISODE_RELEASE_CACHE) || {};
+      const now = Date.now();
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const CACHE_TTL = 12 * 60 * 60 * 1000;
+      const toCheck = tvSeries.filter(
+        (s) => !cache[s.id] || now - (cache[s.id].checkedAt || 0) > CACHE_TTL,
+      );
+
+      // Always show the loading pill (even if everything is cached)
+      setEpisodeCheckStatus("checking");
+
+      if (!toCheck.length) {
+        setEpisodeCheckStatus("none");
+        episodeDismissTimerRef.current = setTimeout(() => {
+          if (!cancelled) setEpisodeCheckStatus(null);
+        }, 2000);
+        return;
+      }
+
+      const BATCH = 3;
+      // Each entry: { title, season, id, seriesItem }
+      const newEpisodeEntries = [];
+
+      for (let i = 0; i < toCheck.length && !cancelled; i += BATCH) {
+        const batch = toCheck.slice(i, i + BATCH);
+        await Promise.all(
+          batch.map(async (series) => {
+            try {
+              const data = await tmdbFetch(`/tv/${series.id}`, key);
+              if (cancelled) return;
+
+              const prev = cache[series.id] || {};
+              const nextEp = data.next_episode_to_air;
+              const nextDate = nextEp?.air_date || null;
+              const lastEp = data.last_episode_to_air;
+              const lastDate = lastEp?.air_date || null;
+              const isFirstCheck = !prev.checkedAt;
+
+              if (isFirstCheck) {
+                // First time seeing this series: notify if the latest episode
+                // aired in the last 7 days (i.e. something recent to watch)
+                const sevenDaysAgo = new Date(today);
+                sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+                if (lastDate && new Date(lastDate) >= sevenDaysAgo) {
+                  newEpisodeEntries.push({
+                    title:
+                      series.title ||
+                      series.name ||
+                      data.name ||
+                      "Unknown series",
+                    season: lastEp?.season_number ?? null,
+                    id: series.id,
+                    seriesItem: series,
+                  });
+                }
+              } else {
+                // Subsequent checks: notify only when a previously-future episode has now become available (or disappeared = aired)
+                const prevWasFuture =
+                  prev.nextEpDate && new Date(prev.nextEpDate) > today;
+                const nowAvailable = nextDate && new Date(nextDate) <= today;
+                const disappeared = prev.nextEpDate && !nextDate;
+
+                if (
+                  (prevWasFuture &&
+                    nowAvailable &&
+                    prev.nextEpDate !== nextDate) ||
+                  (prevWasFuture && disappeared)
+                ) {
+                  // For disappeared (aired) use last_episode; otherwise use next
+                  const ep = disappeared ? lastEp : nextEp;
+                  newEpisodeEntries.push({
+                    title:
+                      series.title ||
+                      series.name ||
+                      data.name ||
+                      "Unknown series",
+                    season: ep?.season_number ?? null,
+                    id: series.id,
+                    seriesItem: series,
+                  });
+                }
+              }
+
+              cache[series.id] = { nextEpDate: nextDate, checkedAt: now };
+            } catch {}
+          }),
+        );
+        if (i + BATCH < toCheck.length && !cancelled) {
+          await new Promise((r) => setTimeout(r, 400));
+        }
+      }
+
+      if (cancelled) return;
+
+      storage.set(STORAGE_KEYS.EPISODE_RELEASE_CACHE, cache);
+
+      if (newEpisodeEntries.length === 0) {
+        setEpisodeCheckStatus("none");
+        // Auto-dismiss after 2 s
+        episodeDismissTimerRef.current = setTimeout(() => {
+          if (!cancelled) setEpisodeCheckStatus(null);
+        }, 2000);
+        return;
+      }
+
+      // Show in-app result card
+      setEpisodeCheckStatus({ entries: newEpisodeEntries });
+
+      // Also fire OS notification
+      if (window.electron?.showNotification) {
+        const names = newEpisodeEntries.map((e) => e.title);
+        const body =
+          names.length === 1
+            ? `${names[0]} has a new episode.`
+            : `${names.slice(0, 3).join(", ")}${
+                names.length > 3 ? ` and ${names.length - 3} more` : ""
+              } have new episodes.`;
+        window.electron.showNotification({
+          title: "New episodes available",
+          body,
+          silent: false,
+        });
+      }
+    }
+
+    checkNewEpisodes().catch(() => {
+      if (!cancelled) setEpisodeCheckStatus(null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiKeyLoaded]);
 
   // ── Downloads state ──────────────────────────────────────────────────────
   const [downloads, setDownloads] = useState([]);
@@ -201,6 +364,19 @@ export default function App() {
   useEffect(() => {
     if (!window.electron) return;
     const handler = window.electron.onDownloadProgress((update) => {
+      // ── Desktop notification ──────────────────────
+      if (
+        update.status === "completed" &&
+        storage.get(STORAGE_KEYS.NOTIFY_DOWNLOAD_COMPLETE) !== false &&
+        window.electron.showNotification
+      ) {
+        window.electron.showNotification({
+          title: "Download complete",
+          body: update.name || "Your download has finished.",
+          silent: false,
+        });
+      }
+
       setDownloads((prev) => {
         const idx = prev.findIndex((d) => d.id === update.id);
         if (idx === -1) {
@@ -778,6 +954,192 @@ export default function App() {
           />
         )}
         {toast && <div className="toast">{toast}</div>}
+
+        {/* ── Episode check status pill / result card ── */}
+        {episodeCheckStatus && (
+          <div
+            style={{
+              position: "fixed",
+              bottom: 24,
+              left: "calc(var(--sidebar) + 24px)",
+              zIndex: 500,
+              background: "var(--surface2)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius)",
+              boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
+              animation: "slideUp 0.3s ease",
+              minWidth: 260,
+              maxWidth: 400,
+            }}
+          >
+            {episodeCheckStatus === "checking" && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "12px 18px",
+                  fontSize: 14,
+                  color: "var(--text2)",
+                }}
+              >
+                <span
+                  style={{
+                    display: "inline-block",
+                    width: 14,
+                    height: 14,
+                    border: "2px solid var(--text3)",
+                    borderTopColor: "var(--red)",
+                    borderRadius: "50%",
+                    animation: "spin 0.7s linear infinite",
+                    flexShrink: 0,
+                  }}
+                />
+                Checking for new episodes…
+              </div>
+            )}
+
+            {episodeCheckStatus === "none" && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "12px 18px",
+                  fontSize: 14,
+                  color: "var(--text3)",
+                }}
+              >
+                <span style={{ fontSize: 16 }}>✓</span>
+                No new episodes found
+              </div>
+            )}
+
+            {episodeCheckStatus?.entries && (
+              <div style={{ padding: "14px 18px" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginBottom: 10,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: "var(--text)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 7,
+                    }}
+                  >
+                    <span style={{ color: "var(--red)", fontSize: 15 }}>
+                      🎬
+                    </span>
+                    New episode
+                    {episodeCheckStatus.entries.length > 1 ? "s" : ""} available
+                  </div>
+                  <button
+                    onClick={() => {
+                      clearTimeout(episodeDismissTimerRef.current);
+                      setEpisodeCheckStatus(null);
+                    }}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--text3)",
+                      cursor: "pointer",
+                      fontSize: 18,
+                      lineHeight: 1,
+                      padding: "0 2px",
+                    }}
+                    aria-label="Dismiss"
+                  >
+                    ×
+                  </button>
+                </div>
+                <ul
+                  style={{
+                    margin: 0,
+                    padding: 0,
+                    listStyle: "none",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 4,
+                  }}
+                >
+                  {episodeCheckStatus.entries.slice(0, 5).map((entry) => (
+                    <li
+                      key={entry.id}
+                      className="episode-check-item"
+                      onClick={() => {
+                        clearTimeout(episodeDismissTimerRef.current);
+                        navigate("tv", {
+                          ...entry.seriesItem,
+                          season: entry.season ?? 1,
+                        });
+                        setEpisodeCheckStatus(null);
+                      }}
+                      style={{
+                        fontSize: 13,
+                        color: "var(--text2)",
+                        padding: "5px 0",
+                        paddingBottom: 7,
+                        borderBottom: "1px solid var(--border)",
+                        cursor: "pointer",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: 8,
+                        borderRadius: 4,
+                        transition: "color 0.15s",
+                      }}
+                    >
+                      <span
+                        style={{
+                          flex: 1,
+                          minWidth: 0,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {entry.title}
+                      </span>
+                      {entry.season != null && (
+                        <span
+                          style={{
+                            fontSize: 11,
+                            color: "var(--text3)",
+                            background: "var(--surface3)",
+                            borderRadius: 4,
+                            padding: "1px 6px",
+                            flexShrink: 0,
+                          }}
+                        >
+                          Staffel {entry.season}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                  {episodeCheckStatus.entries.length > 5 && (
+                    <li
+                      style={{
+                        fontSize: 12,
+                        color: "var(--text3)",
+                        paddingTop: 2,
+                      }}
+                    >
+                      +{episodeCheckStatus.entries.length - 5} more
+                    </li>
+                  )}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
         {closeConfirm && (
           <CloseConfirmModal
             count={closeConfirm.count}

@@ -41,6 +41,11 @@ export const BACKUP_KEYS = [
   "reduceAnimations",
   "librarySort",
   "historyEnabled",
+  // Notification preferences
+  "notifyDownloadComplete",
+  "notifyNewEpisode",
+  // Episode-release cache
+  "episodeReleaseCache",
 ];
 
 /**

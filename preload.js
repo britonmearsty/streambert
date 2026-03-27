@@ -91,6 +91,10 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.removeListener("blocked-stats-update", h),
   getBlockStats: () => ipcRenderer.invoke("get-block-stats"),
 
+  // Desktop notifications (triggered from renderer, executed in main)
+  showNotification: ({ title, body, silent }) =>
+    ipcRenderer.invoke("show-notification", { title, body, silent }),
+
   // Quit app
   quitApp: () => ipcRenderer.invoke("quit-app"),
 

@@ -1665,6 +1665,101 @@ function SubtitleSettingsSection() {
   );
 }
 
+// ── Notifications Section ─────────────────────────────────────────────────────
+function NotificationsSection() {
+  const [notifyDownload, setNotifyDownload] = useState(
+    () => storage.get(STORAGE_KEYS.NOTIFY_DOWNLOAD_COMPLETE) !== false,
+  );
+  const [notifyEpisode, setNotifyEpisode] = useState(
+    () => !!storage.get(STORAGE_KEYS.NOTIFY_NEW_EPISODE),
+  );
+  const [saved, setSaved] = useState(false);
+
+  const saveSettings = () => {
+    storage.set(STORAGE_KEYS.NOTIFY_DOWNLOAD_COMPLETE, notifyDownload);
+    storage.set(STORAGE_KEYS.NOTIFY_NEW_EPISODE, notifyEpisode);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const ToggleRow = ({ label, description, value, onChange }) => (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 14,
+        padding: "16px 0",
+        borderBottom: "1px solid var(--border)",
+      }}
+    >
+      <Toggle value={value} onChange={onChange} />
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text)" }}>
+          {label}
+        </div>
+        <div
+          style={{
+            fontSize: 12,
+            color: "var(--text3)",
+            marginTop: 3,
+            lineHeight: 1.5,
+          }}
+        >
+          {description}
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ marginBottom: 40 }}>
+      <div className="settings-section-title">Desktop Notifications</div>
+      <div
+        style={{
+          fontSize: 13,
+          color: "var(--text3)",
+          marginBottom: 16,
+          lineHeight: 1.6,
+        }}
+      >
+        Control which events trigger an OS desktop notification.
+      </div>
+
+      <div
+        style={{
+          background: "var(--surface)",
+          border: "1px solid var(--border)",
+          borderRadius: 10,
+          padding: "0 16px",
+          marginBottom: 20,
+        }}
+      >
+        <ToggleRow
+          label="Notify when a download completes"
+          description="Shows a desktop notification when an item finishes downloading."
+          value={notifyDownload}
+          onChange={setNotifyDownload}
+        />
+        <ToggleRow
+          label="Notify about new episodes on startup"
+          description="On startup, checks every TV series you have saved for newly released episodes and notifies you if any aired since the last check."
+          value={notifyEpisode}
+          onChange={setNotifyEpisode}
+        />
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <button className="btn btn-primary" onClick={saveSettings}>
+          Save
+        </button>
+        {saved && (
+          <span style={{ fontSize: 13, color: "#48c774" }}>✓ Saved</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Section Group Header ──────────────────────────────────────────────────────
 function SectionGroupHeader({ title, subtitle }) {
   return (
@@ -1790,6 +1885,22 @@ const SECTION_NAV = [
       "video",
       "movies",
       "files",
+    ],
+  },
+  {
+    id: "notifications",
+    label: "Notifications",
+    icon: "🔔",
+    keywords: [
+      "notification",
+      "notify",
+      "alert",
+      "desktop",
+      "episode",
+      "download",
+      "watchlist",
+      "new episode",
+      "release",
     ],
   },
   {
@@ -2487,6 +2598,7 @@ export default function SettingsPage({ apiKey, onChangeApiKey }) {
   const secPlayback = useRef(null);
   const secSubtitles = useRef(null);
   const secDownloads = useRef(null);
+  const secNotifications = useRef(null);
   const secInterface = useRef(null);
   const secLibrary = useRef(null);
   const secBackup = useRef(null);
@@ -2498,6 +2610,7 @@ export default function SettingsPage({ apiKey, onChangeApiKey }) {
     playback: secPlayback,
     subtitles: secSubtitles,
     downloads: secDownloads,
+    notifications: secNotifications,
     interface: secInterface,
     library: secLibrary,
     backup: secBackup,
@@ -3108,6 +3221,17 @@ export default function SettingsPage({ apiKey, onChangeApiKey }) {
               </div>
             )}
           </div>
+        </div>
+
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        {/* GROUP: NOTIFICATIONS                                               */}
+        {/* ══════════════════════════════════════════════════════════════════ */}
+        <div ref={secNotifications} style={{ scrollMarginTop: 80 }}>
+          <SectionGroupHeader
+            title="Notifications"
+            subtitle="Desktop alerts for downloads and new episode releases"
+          />
+          <NotificationsSection />
         </div>
 
         {/* ══════════════════════════════════════════════════════════════════ */}

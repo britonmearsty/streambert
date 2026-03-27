@@ -2,7 +2,13 @@
 // Responsible for: window creation, session setup, ad-blocking, scheduled
 // backup trigger, and app lifecycle. All heavy IPC logic lives in src/ipc/.
 
-const { app, BrowserWindow, ipcMain, session } = require("electron");
+const {
+  app,
+  BrowserWindow,
+  ipcMain,
+  session,
+  Notification,
+} = require("electron");
 const path = require("path");
 
 // ── Startup benchmark ─────────────────────────────────────────────────────────
@@ -263,6 +269,23 @@ blockStats.init(getMainWindow);
 
 // get-block-stats lives with its data
 ipcMain.handle("get-block-stats", () => blockStats.getBlockStats());
+
+// ── Desktop notifications ─────────────────────────────────────────────────────
+// Called from the renderer whenever it wants a native OS notification.
+ipcMain.handle(
+  "show-notification",
+  (_event, { title, body, silent = false }) => {
+    try {
+      if (!Notification.isSupported()) return;
+      const n = new Notification({
+        title: String(title),
+        body: String(body),
+        silent,
+      });
+      n.show();
+    } catch {}
+  },
+);
 
 // ── Single-instance lock ──────────────────────────────────────────────────────
 const gotTheLock = app.requestSingleInstanceLock();

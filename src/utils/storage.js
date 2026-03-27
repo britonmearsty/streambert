@@ -64,6 +64,11 @@ export const STORAGE_KEYS = {
   REDUCE_ANIMATIONS: "reduceAnimations",
   LIBRARY_SORT: "librarySort",
   HISTORY_ENABLED: "historyEnabled",
+  // Notification preferences
+  NOTIFY_DOWNLOAD_COMPLETE: "notifyDownloadComplete",
+  NOTIFY_NEW_EPISODE: "notifyNewEpisode",
+  // Cache for new-episode startup check
+  EPISODE_RELEASE_CACHE: "episodeReleaseCache",
 };
 
 export const getApiKey = () => storage.get(STORAGE_KEYS.API_KEY);
