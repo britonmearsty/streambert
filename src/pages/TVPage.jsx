@@ -1377,7 +1377,7 @@ export default function TVPage({
                           title,
                         )
                   }
-                  partition="persist:videasy"
+                  partition="persist:player"
                   allowpopups="false"
                   sandbox="allow-scripts allow-same-origin allow-forms"
                   style={{

@@ -71,7 +71,7 @@ const BLOCKED_HOSTS = [
 let mainWindow = null;
 const getMainWindow = () => mainWindow;
 
-function setupSession(videasySession, trailerSession) {
+function setupSession(playerSession, trailerSession) {
   const stripHeaders = (details, callback) => {
     const headers = { ...details.responseHeaders };
     for (const key of Object.keys(headers)) {
@@ -84,10 +84,10 @@ function setupSession(videasySession, trailerSession) {
 
   const UA =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
-  videasySession.setUserAgent(UA);
+  playerSession.setUserAgent(UA);
   trailerSession.setUserAgent(UA);
 
-  videasySession.webRequest.onHeadersReceived(
+  playerSession.webRequest.onHeadersReceived(
     { urls: ["*://*/*"] },
     stripHeaders,
   );
@@ -101,14 +101,14 @@ function setupSession(videasySession, trailerSession) {
     cb({ cancel: true }),
   );
 
-  // Videasy: block ads + intercept m3u8/vtt URLs for renderer
+  // Player session: block ads + intercept m3u8/vtt URLs for renderer
   const MEDIA_URLS = [
     "*://*/*.m3u8*",
     "*://*/*.m3u8",
     "*://*/*.vtt*",
     "*://*/*.vtt",
   ];
-  videasySession.webRequest.onBeforeRequest(
+  playerSession.webRequest.onBeforeRequest(
     { urls: [...BLOCKED_HOSTS, ...MEDIA_URLS] },
     (details, callback) => {
       const { url } = details;
@@ -164,7 +164,7 @@ function setupSession(videasySession, trailerSession) {
   for (const domain of [".youtube.com", ".youtube-nocookie.com"]) {
     const cookie = { ...ytCookie, domain };
     trailerSession.cookies.set(cookie).catch(() => {});
-    videasySession.cookies.set(cookie).catch(() => {});
+    playerSession.cookies.set(cookie).catch(() => {});
   }
 }
 
@@ -189,9 +189,9 @@ function createWindow() {
     },
   });
 
-  const videasySession = session.fromPartition("persist:videasy");
+  const playerSession = session.fromPartition("persist:player");
   const trailerSession = session.fromPartition("persist:trailer");
-  setupSession(videasySession, trailerSession);
+  setupSession(playerSession, trailerSession);
 
   // Force long-lived disk caching for TMDB images in the default session.
   session.defaultSession.webRequest.onHeadersReceived(
