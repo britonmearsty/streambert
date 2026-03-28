@@ -668,6 +668,26 @@ export default function TVPage({
     return () => window.electron.offM3u8Found(handler);
   }, []);
 
+  // Close source dropdown on scroll or click-outside
+  useEffect(() => {
+    if (!showSourceMenu) return;
+    const close = () => setShowSourceMenu(false);
+    window.addEventListener("scroll", close, { capture: true, passive: true });
+    const handleClick = (e) => {
+      if (
+        sourceRef.current?.contains(e.target) ||
+        e.target.closest(".source-dropdown")
+      )
+        return;
+      close();
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => {
+      window.removeEventListener("scroll", close, { capture: true });
+      document.removeEventListener("mousedown", handleClick);
+    };
+  }, [showSourceMenu]);
+
   useEffect(() => {
     if (!window.electron) return;
     const handler = window.electron.onSubtitleFound(({ url, lang }) => {
@@ -1435,7 +1455,10 @@ export default function TVPage({
                   {/* Blocked ads & trackers button */}
                   <button
                     className="player-overlay-btn"
-                    onClick={() => setShowBlockedModal(true)}
+                    onClick={() => {
+                      setShowSourceMenu(false);
+                      setShowBlockedModal(true);
+                    }}
                     title="Blocked ads & trackers"
                   >
                     <ShieldBlockIcon />
