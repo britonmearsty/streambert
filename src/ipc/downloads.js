@@ -779,6 +779,9 @@ function register(getMainWindow) {
   ipcMain.handle("open-path", (_, filePath) => {
     shell.openPath(filePath);
   });
+  ipcMain.handle("get-install-path", () => {
+    return app.getAppPath();
+  });
 
   ipcMain.handle("scan-directory", (_, folderPath) => {
     try {

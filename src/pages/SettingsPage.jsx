@@ -1722,7 +1722,7 @@ function NotificationsSection() {
           lineHeight: 1.6,
         }}
       >
-        Control which events trigger an OS desktop notification.
+        Control which events trigger a desktop notification.
       </div>
 
       <div
@@ -3288,6 +3288,21 @@ export default function SettingsPage({ apiKey, onChangeApiKey }) {
               overflow: "hidden",
             }}
           >
+            {/* Install location */}
+            <div style={{ padding: "22px 24px" }}>
+              <CleanRow
+                title="Install Location"
+                description="Opens the folder where Streambert is installed."
+                buttonLabel="Open Folder"
+                onAction={async () => {
+                  const p = await window.electron?.getInstallPath?.();
+                  if (p) window.electron.openPath(p);
+                }}
+              />
+            </div>
+
+            <div style={{ height: 1, background: "var(--border)" }} />
+
             {/* Cache */}
             <div style={{ padding: "22px 24px" }}>
               <CleanRow
