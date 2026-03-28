@@ -841,7 +841,7 @@ function register(getMainWindow) {
     try {
       const sessions = [
         session.defaultSession,
-        session.fromPartition("persist:videasy"),
+        session.fromPartition("persist:player"),
         session.fromPartition("persist:trailer"),
       ];
       await Promise.all(sessions.map((s) => s.clearCache()));
@@ -860,7 +860,7 @@ function register(getMainWindow) {
 
   ipcMain.handle("clear-watch-data", async () => {
     try {
-      const vs = session.fromPartition("persist:videasy");
+      const vs = session.fromPartition("persist:player");
       await vs.clearStorageData();
       await vs.clearCache();
       return { ok: true };
@@ -873,7 +873,7 @@ function register(getMainWindow) {
     try {
       const sessions = [
         session.defaultSession,
-        session.fromPartition("persist:videasy"),
+        session.fromPartition("persist:player"),
         session.fromPartition("persist:trailer"),
       ];
       const sizes = await Promise.all(sessions.map((s) => s.getCacheSize()));
@@ -887,7 +887,7 @@ function register(getMainWindow) {
     try {
       const sessions = [
         session.defaultSession,
-        session.fromPartition("persist:videasy"),
+        session.fromPartition("persist:player"),
         session.fromPartition("persist:trailer"),
       ];
       await Promise.all(sessions.map((s) => s.clearStorageData()));
