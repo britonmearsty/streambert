@@ -1,4 +1,12 @@
-import { useState, useEffect, useRef, memo, useCallback, useMemo } from "react";
+import {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  memo,
+  useCallback,
+  useMemo,
+} from "react";
 import {
   tmdbFetch,
   imgUrl,
@@ -381,6 +389,27 @@ export default function MoviePage({
     if (playing) setWebviewLoading(true);
   }, [playing]);
 
+  // ── Webview memory cleanup ────────────────────────────────────────────────
+  // useLayoutEffect fires synchronously BEFORE React mutates the DOM, so the
+  // webview is still attached when we navigate it to about:blank.
+  // This lets Chromium unload.
+  useLayoutEffect(() => {
+    if (playing) return;
+    const wv = webviewRef.current;
+    if (wv) {
+      try {
+        wv.src = "about:blank";
+      } catch {}
+    }
+  }, [playing]);
+
+  // On unmount: signal main process to destroy the player WebContents and flush session cache.
+  useEffect(() => {
+    return () => {
+      window.electron?.playerStopped?.();
+    };
+  }, []);
+
   // Attach webview load events so we know when the new source has painted
   useEffect(() => {
     if (!playing) return;
@@ -563,7 +592,7 @@ export default function MoviePage({
         <div
           className="detail-bg"
           style={{
-            backgroundImage: `url(${imgUrl(d.backdrop_path, "original")})`,
+            backgroundImage: `url(${imgUrl(d.backdrop_path, "w1280")})`,
           }}
         />
         <div className="detail-gradient" />

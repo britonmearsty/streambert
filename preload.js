@@ -99,6 +99,9 @@ contextBridge.exposeInMainWorld("electron", {
   // Quit app
   quitApp: () => ipcRenderer.invoke("quit-app"),
 
+  // Signal to main process that the player has stopped
+  playerStopped: () => ipcRenderer.send("player-stopped"),
+
   // Storage cleaning
   getCacheSize: () => ipcRenderer.invoke("get-cache-size"),
   getDownloadsSize: () => ipcRenderer.invoke("get-downloads-size"),

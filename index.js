@@ -7,9 +7,27 @@ const {
   BrowserWindow,
   ipcMain,
   session,
+  webContents,
   Notification,
 } = require("electron");
 const path = require("path");
+
+// ── RAM / performance flags ───────────────────────────────────────────────────
+app.commandLine.appendSwitch(
+  "js-flags",
+  "--max-old-space-size=256 --expose-gc",
+);
+app.commandLine.appendSwitch(
+  "disable-features",
+  "HardwareMediaKeyHandling,MediaSessionService,UseSandboxedXdgPortal",
+);
+// Run the network stack in the browser process → one less utility process
+app.commandLine.appendSwitch("enable-features", "NetworkServiceInProcess2");
+// More aggressive memory management: smaller caches, earlier GC pressure
+app.commandLine.appendSwitch("enable-low-end-device-mode");
+// Cap disk cache and limit renderer processes (prevents RAM growth on multi-page navigation)
+app.commandLine.appendSwitch("disk-cache-size", String(80 * 1024 * 1024));
+app.commandLine.appendSwitch("renderer-process-limit", "3");
 
 // ── Startup benchmark ─────────────────────────────────────────────────────────
 const _t0 = Date.now();
@@ -67,9 +85,11 @@ const BLOCKED_HOSTS = [
   "*://tmstr4.neonhorizonworkshops.com/*",
 ];
 
-// ── Window ────────────────────────────────────────────────────────────────────
+// ── Module-level state ────────────────────────────────────────────────────────
 let mainWindow = null;
 const getMainWindow = () => mainWindow;
+
+const playerWcIds = new Set();
 
 function setupSession(playerSession, trailerSession) {
   const stripHeaders = (details, callback) => {
@@ -186,12 +206,12 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       webviewTag: true,
+      backgroundThrottling: true,
+      spellcheck: false,
+      // Caps the renderer's V8 heap + exposes gc() for manual GC hints after navigation
+      additionalArguments: ["--js-flags=--max-old-space-size=256 --expose-gc"],
     },
   });
-
-  const playerSession = session.fromPartition("persist:player");
-  const trailerSession = session.fromPartition("persist:trailer");
-  setupSession(playerSession, trailerSession);
 
   // Force long-lived disk caching for TMDB images in the default session.
   session.defaultSession.webRequest.onHeadersReceived(
@@ -205,8 +225,28 @@ function createWindow() {
     },
   );
 
-  // Block popups from webviews, intercept fullscreen
+  // ── Lazy session setup ────────────────────────────────────────────────────
+  // Player/trailer sessions are only configured on the first webview attach
+  // (i.e. when the user actually opens a movie/trailer), not at startup.
+  let sessionsConfigured = false;
+
+  // Block popups from webviews, intercept fullscreen, lazy-init sessions
   mainWindow.webContents.on("did-attach-webview", (_, wc) => {
+    if (!sessionsConfigured) {
+      sessionsConfigured = true;
+      const playerSession = session.fromPartition("persist:player");
+      const trailerSession = session.fromPartition("persist:trailer");
+      setupSession(playerSession, trailerSession);
+    }
+
+    // Track player webviews for cleanup on player-stopped
+    try {
+      if (wc.session === session.fromPartition("persist:player")) {
+        playerWcIds.add(wc.id);
+        wc.once("destroyed", () => playerWcIds.delete(wc.id));
+      }
+    } catch {}
+
     wc.setWindowOpenHandler(() => ({ action: "deny" }));
     wc.on("enter-html-full-screen", () =>
       mainWindow.webContents.send("webview-enter-fullscreen"),
@@ -269,6 +309,43 @@ blockStats.init(getMainWindow);
 
 // get-block-stats lives with its data
 ipcMain.handle("get-block-stats", () => blockStats.getBlockStats());
+
+// ── Player memory cleanup ─────────────────────────────────────────────
+// Called by MoviePage / TVPage on component unmount.
+// Destroys the player webview WebContents by tracked ID, then flushes caches and GCs.
+ipcMain.on("player-stopped", () => {
+  // Step 1: Mute + destroy all tracked player WebContents by ID.
+  for (const id of playerWcIds) {
+    try {
+      const wc = webContents.fromId(id);
+      if (wc && !wc.isDestroyed()) {
+        try {
+          wc.setAudioMuted(true);
+        } catch {}
+        wc.destroy();
+      }
+    } catch {}
+  }
+  playerWcIds.clear();
+
+  // Step 2: Flush HTTP + shader caches from the player session.
+  try {
+    const ps = session.fromPartition("persist:player");
+    ps.clearCache().catch(() => {});
+    ps.clearStorageData({ storages: ["shadercache", "cachestorage"] }).catch(
+      () => {},
+    );
+  } catch {}
+
+  // Step 3: GC hints
+  if (typeof global.gc === "function") global.gc();
+  const mw = mainWindow;
+  if (mw && !mw.isDestroyed()) {
+    mw.webContents
+      .executeJavaScript("if(typeof gc==='function') gc();")
+      .catch(() => {});
+  }
+});
 
 // ── Desktop notifications ─────────────────────────────────────────────────────
 // Called from the renderer whenever it wants a native OS notification.

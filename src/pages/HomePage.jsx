@@ -87,7 +87,7 @@ export default function HomePage({
     const tryFetch = (endpoint) =>
       tmdbFetch(`/${type}/${source.id}/${endpoint}`, apiKey).then((data) =>
         (data.results || [])
-          .slice(0, 20)
+          .slice(0, 10)
           .map((item) => ({ ...item, media_type: type })),
       );
     tryFetch("similar")
@@ -118,10 +118,10 @@ export default function HomePage({
     ])
       .then(([moviesData, tvData]) => {
         const movies = (moviesData.results || [])
-          .slice(0, 15)
+          .slice(0, 8)
           .map((i) => ({ ...i, media_type: "movie" }));
         const tv = (tvData.results || [])
-          .slice(0, 15)
+          .slice(0, 8)
           .map((i) => ({ ...i, media_type: "tv" }));
         // Interleave movies and TV for variety
         const merged = [];
@@ -139,13 +139,13 @@ export default function HomePage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiKey, offline]);
 
-  // Stable pre-built item arrays for carousels
+  // Stable pre-built item arrays for carousels, capped at 10
   const trendingMovieItems = useMemo(
-    () => trending.map((i) => ({ ...i, media_type: "movie" })),
+    () => trending.slice(0, 10).map((i) => ({ ...i, media_type: "movie" })),
     [trending],
   );
   const trendingTVItems = useMemo(
-    () => trendingTV.map((i) => ({ ...i, media_type: "tv" })),
+    () => trendingTV.slice(0, 10).map((i) => ({ ...i, media_type: "tv" })),
     [trendingTV],
   );
 
@@ -309,7 +309,7 @@ export default function HomePage({
           <div
             className="hero-bg"
             style={{
-              backgroundImage: `url(${imgUrl(hero.backdrop_path, "original")})`,
+              backgroundImage: `url(${imgUrl(hero.backdrop_path, "w1280")})`,
             }}
           />
           <div className="hero-gradient" />

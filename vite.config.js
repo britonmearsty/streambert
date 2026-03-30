@@ -7,11 +7,21 @@ export default defineConfig({
   build: {
     minify: "terser",
     terserOptions: {
-      compress: { drop_console: false, drop_debugger: true },
+      compress: {
+        drop_console: true, // removes console.log in prod
+        drop_debugger: true,
+      },
     },
     rollupOptions: {
       output: {
-        manualChunks: undefined,
+        // Code-Splitting
+        manualChunks: {
+          react: ["react", "react-dom"],
+          settings: ["./src/pages/SettingsPage"],
+          movie: ["./src/pages/MoviePage"],
+          tv: ["./src/pages/TVPage"],
+          downloads: ["./src/pages/DownloadsPage"],
+        },
       },
     },
   },

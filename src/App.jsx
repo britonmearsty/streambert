@@ -1,4 +1,12 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+  lazy,
+  Suspense,
+} from "react";
 import ErrorBoundary from "./components/ErrorBoundary";
 import KeyboardShortcutsModal from "./components/KeyboardShortcutsModal";
 import WindowTitlebar from "./components/WindowTitlebar";
@@ -13,13 +21,14 @@ import SetupScreen from "./components/SetupScreen";
 import CloseConfirmModal from "./components/CloseConfirmModal";
 import UpdateModal from "./components/UpdateModal";
 
-import HomePage from "./pages/HomePage";
-import MoviePage from "./pages/MoviePage";
-import TVPage from "./pages/TVPage";
-import LibraryPage from "./pages/LibraryPage";
-import SettingsPage from "./pages/SettingsPage";
+// Lazy-loaded pages: each chunk is only downloaded when the user first visits
+const HomePage = lazy(() => import("./pages/HomePage"));
+const MoviePage = lazy(() => import("./pages/MoviePage"));
+const TVPage = lazy(() => import("./pages/TVPage"));
+const LibraryPage = lazy(() => import("./pages/LibraryPage"));
+const SettingsPage = lazy(() => import("./pages/SettingsPage"));
+const DownloadsPage = lazy(() => import("./pages/DownloadsPage"));
 import { checkForUpdates } from "./utils/updates";
-import DownloadsPage from "./pages/DownloadsPage";
 
 export default function App() {
   // apiKey loaded async from secure storage (OS keychain)
@@ -415,16 +424,28 @@ export default function App() {
   );
 
   // ── Trending, single shared fetch fn avoids code duplication ────────────
+  // Results are cached in localStorage for 30 min to avoid redundant API calls
+  // and to keep trending data out of RAM between restarts.
   const fetchTrending = useCallback(() => {
     if (!apiKey) return;
+    const cached = storage.get("trendingCache");
+    const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+    if (cached && cached.ts && Date.now() - cached.ts < CACHE_TTL) {
+      setTrending(cached.movies || []);
+      setTrendingTV(cached.tv || []);
+      return;
+    }
     setLoadingHome(true);
     Promise.all([
       tmdbFetch("/trending/movie/week", apiKey),
       tmdbFetch("/trending/tv/week", apiKey),
     ])
       .then(([m, t]) => {
-        setTrending(m.results || []);
-        setTrendingTV(t.results || []);
+        const movies = m.results || [];
+        const tv = t.results || [];
+        setTrending(movies);
+        setTrendingTV(tv);
+        storage.set("trendingCache", { movies, tv, ts: Date.now() });
       })
       .catch(() => {})
       .finally(() => setLoadingHome(false));
@@ -490,6 +511,9 @@ export default function App() {
       const last = prev[prev.length - 1];
       setPage(last.page);
       setSelected(last.selected);
+      if (typeof gc === "function") {
+        requestIdleCallback(() => gc(), { timeout: 2000 });
+      }
       return prev.slice(0, -1);
     });
   }, []);
@@ -502,6 +526,10 @@ export default function App() {
     setSelected(data);
     setPage(pg);
     setShowSearch(false);
+    // After navigating away, the previous page's component unmounts
+    if (typeof gc === "function") {
+      requestIdleCallback(() => gc(), { timeout: 2000 });
+    }
   }, []);
 
   // ── Keyboard shortcuts ────────────────────────────────────────────────────
@@ -768,6 +796,7 @@ export default function App() {
 
         <div className="main">
           {/* ── API key status banner ── */}
+          {/* Suspense boundary: lazy page chunks are fetched on first visit */}
           {apiKeyStatus === "invalid_token" && (
             <div className="api-status-banner api-status-error">
               <span>
@@ -795,97 +824,112 @@ export default function App() {
               </button>
             </div>
           )}
-          {page === "home" && (
-            <HomePage
-              trending={trending}
-              trendingTV={trendingTV}
-              loading={loadingHome}
-              onSelect={handleSelectResult}
-              progress={progress}
-              inProgress={inProgress}
-              offline={offline}
-              onRetry={retryHome}
-              watched={watched}
-              onMarkWatched={markWatched}
-              onMarkUnwatched={markUnwatched}
-              history={history}
-              apiKey={apiKey}
-            />
-          )}
-          {page === "movie" && selected && (
-            <MoviePage
-              item={selected}
-              apiKey={apiKey}
-              onSave={() => toggleSave(selected)}
-              isSaved={isSaved(selected)}
-              onHistory={addHistory}
-              progress={progress}
-              saveProgress={saveProgress}
-              onBack={() => navigate("home")}
-              onSettings={() => navigate("settings")}
-              onDownloadStarted={handleDownloadStarted}
-              watched={watched}
-              onMarkWatched={markWatched}
-              onMarkUnwatched={markUnwatched}
-              downloads={downloads}
-              onGoToDownloads={handleGoToDownloads}
-              onSelect={handleSelectResult}
-            />
-          )}
-          {page === "tv" && selected && (
-            <TVPage
-              item={selected}
-              apiKey={apiKey}
-              onSave={() => toggleSave(selected)}
-              isSaved={isSaved(selected)}
-              onHistory={addHistory}
-              progress={progress}
-              saveProgress={saveProgress}
-              onBack={() => navigate("home")}
-              onSettings={() => navigate("settings")}
-              onDownloadStarted={handleDownloadStarted}
-              watched={watched}
-              onMarkWatched={markWatched}
-              onMarkUnwatched={markUnwatched}
-              downloads={downloads}
-              onGoToDownloads={handleGoToDownloads}
-            />
-          )}
-          {page === "history" && (
-            <LibraryPage
-              history={history}
-              inProgress={inProgress}
-              saved={savedList}
-              progress={progress}
-              onSelect={handleSelectResult}
-              watched={watched}
-              onMarkWatched={markWatched}
-              onMarkUnwatched={markUnwatched}
-            />
-          )}
-          {page === "settings" && (
-            <SettingsPage apiKey={apiKey} onChangeApiKey={changeApiKey} />
-          )}
-          {page === "downloads" && (
-            <DownloadsPage
-              downloads={downloads}
-              onDeleteDownload={handleDeleteDownload}
-              onHistory={addHistory}
-              onSaveProgress={saveProgress}
-              progress={progress}
-              watched={watched}
-              onMarkWatched={markWatched}
-              onMarkUnwatched={markUnwatched}
-              highlightId={highlightDownload}
-              onClearHighlight={() => setHighlightDownload(null)}
-              onSelect={handleSelectResult}
-              onUpdateDownload={(id, updates) =>
-                setDownloads((prev) =>
-                  prev.map((d) => (d.id === id ? { ...d, ...updates } : d)),
-                )
-              }
-            />
-          )}
+          <Suspense
+            fallback={
+              <div
+                style={{
+                  color: "var(--text2)",
+                  padding: 48,
+                  textAlign: "center",
+                  fontSize: 15,
+                }}
+              >
+                Laden…
+              </div>
+            }
+          >
+            {page === "home" && (
+              <HomePage
+                trending={trending}
+                trendingTV={trendingTV}
+                loading={loadingHome}
+                onSelect={handleSelectResult}
+                progress={progress}
+                inProgress={inProgress}
+                offline={offline}
+                onRetry={retryHome}
+                watched={watched}
+                onMarkWatched={markWatched}
+                onMarkUnwatched={markUnwatched}
+                history={history}
+                apiKey={apiKey}
+              />
+            )}
+            {page === "movie" && selected && (
+              <MoviePage
+                item={selected}
+                apiKey={apiKey}
+                onSave={() => toggleSave(selected)}
+                isSaved={isSaved(selected)}
+                onHistory={addHistory}
+                progress={progress}
+                saveProgress={saveProgress}
+                onBack={() => navigate("home")}
+                onSettings={() => navigate("settings")}
+                onDownloadStarted={handleDownloadStarted}
+                watched={watched}
+                onMarkWatched={markWatched}
+                onMarkUnwatched={markUnwatched}
+                downloads={downloads}
+                onGoToDownloads={handleGoToDownloads}
+                onSelect={handleSelectResult}
+              />
+            )}
+            {page === "tv" && selected && (
+              <TVPage
+                item={selected}
+                apiKey={apiKey}
+                onSave={() => toggleSave(selected)}
+                isSaved={isSaved(selected)}
+                onHistory={addHistory}
+                progress={progress}
+                saveProgress={saveProgress}
+                onBack={() => navigate("home")}
+                onSettings={() => navigate("settings")}
+                onDownloadStarted={handleDownloadStarted}
+                watched={watched}
+                onMarkWatched={markWatched}
+                onMarkUnwatched={markUnwatched}
+                downloads={downloads}
+                onGoToDownloads={handleGoToDownloads}
+              />
+            )}
+            {page === "history" && (
+              <LibraryPage
+                history={history}
+                inProgress={inProgress}
+                saved={savedList}
+                progress={progress}
+                onSelect={handleSelectResult}
+                watched={watched}
+                onMarkWatched={markWatched}
+                onMarkUnwatched={markUnwatched}
+              />
+            )}
+            {page === "settings" && (
+              <SettingsPage apiKey={apiKey} onChangeApiKey={changeApiKey} />
+            )}
+            {page === "downloads" && (
+              <DownloadsPage
+                downloads={downloads}
+                onDeleteDownload={handleDeleteDownload}
+                onHistory={addHistory}
+                onSaveProgress={saveProgress}
+                progress={progress}
+                watched={watched}
+                onMarkWatched={markWatched}
+                onMarkUnwatched={markUnwatched}
+                highlightId={highlightDownload}
+                onClearHighlight={() => setHighlightDownload(null)}
+                onSelect={handleSelectResult}
+                onUpdateDownload={(id, updates) =>
+                  setDownloads((prev) =>
+                    prev.map((d) => (d.id === id ? { ...d, ...updates } : d)),
+                  )
+                }
+              />
+            )}
+          </Suspense>
         </div>
 
         {showSearch && (
