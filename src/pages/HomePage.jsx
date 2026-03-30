@@ -149,121 +149,6 @@ export default function HomePage({
     [trendingTV],
   );
 
-  // ── Row renderers ──────────────────────────────────────────────────────────
-
-  const renderContinueWatching = () => {
-    if (!rowVisible.continue || inProgress.length === 0) return null;
-    return (
-      <div key="continue" className="section">
-        <div className="section-title">Continue Watching</div>
-        <div className="cards-grid">
-          {inProgress.map((item) => {
-            const pk =
-              item.media_type === "movie"
-                ? `movie_${item.id}`
-                : `tv_${item.id}_s${item.season}e${item.episode}`;
-            const r = getRating(item);
-            const restr = itemRestricted(item);
-            return (
-              <MediaCard
-                key={`${item.media_type}_${item.id}`}
-                item={item}
-                onClick={() => onSelect(item)}
-                progress={progress[pk] || 0}
-                watched={watched}
-                onMarkWatched={onMarkWatched}
-                onMarkUnwatched={onMarkUnwatched}
-                ageRating={r.cert}
-                restricted={restr}
-              />
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
-
-  const renderSimilar = () => {
-    if (!rowVisible.similar || !similarSource || similarItems.length === 0)
-      return null;
-    return (
-      <TrendingCarousel
-        key="similar"
-        items={similarItems}
-        title="Similar to"
-        titleHighlight={similarSource.title || similarSource.name}
-        onSelect={onSelect}
-        ratingsMap={enrichedRatingsMap}
-      />
-    );
-  };
-
-  const renderTrendingMovies = () => {
-    if (!rowVisible.trendingMovies || trendingMovieItems.length === 0)
-      return null;
-    return (
-      <TrendingCarousel
-        key="trendingMovies"
-        items={trendingMovieItems}
-        title="Trending Movies"
-        onSelect={onSelect}
-        ratingsMap={enrichedRatingsMap}
-      />
-    );
-  };
-
-  const renderTrendingTV = () => {
-    if (!rowVisible.trendingTV || trendingTVItems.length === 0) return null;
-    return (
-      <TrendingCarousel
-        key="trendingTV"
-        items={trendingTVItems}
-        title="Trending Series"
-        onSelect={onSelect}
-        ratingsMap={enrichedRatingsMap}
-      />
-    );
-  };
-
-  const renderTopRated = () => {
-    if (!rowVisible.topRated || topRatedItems.length === 0) return null;
-    return (
-      <TrendingCarousel
-        key="topRated"
-        items={topRatedItems}
-        title="Top Rated"
-        onSelect={onSelect}
-        ratingsMap={enrichedRatingsMap}
-      />
-    );
-  };
-
-  const rowRenderers = useMemo(
-    () => ({
-      continue: renderContinueWatching,
-      similar: renderSimilar,
-      trendingMovies: renderTrendingMovies,
-      trendingTV: renderTrendingTV,
-      topRated: renderTopRated,
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }),
-    [
-      inProgress,
-      similarItems,
-      similarSource,
-      trendingMovieItems,
-      trendingTVItems,
-      topRatedItems,
-      enrichedRatingsMap,
-      rowVisible,
-      progress,
-      watched,
-      onSelect,
-      onMarkWatched,
-      onMarkUnwatched,
-    ],
-  );
-
   return (
     <div className="fade-in">
       {/* ── Offline ── */}
@@ -309,7 +194,7 @@ export default function HomePage({
           <div
             className="hero-bg"
             style={{
-              backgroundImage: `url(${imgUrl(hero.backdrop_path, "w1280")})`,
+              backgroundImage: `url(${imgUrl(hero.backdrop_path, "original")})`,
             }}
           />
           <div className="hero-gradient" />
@@ -342,7 +227,96 @@ export default function HomePage({
       )}
 
       {/* ── Rows in user-configured order ── */}
-      {rowOrder.map((id) => rowRenderers[id]?.())}
+      {rowOrder.map((id) => {
+        if (!rowVisible[id]) return null;
+
+        if (id === "continue") {
+          if (inProgress.length === 0) return null;
+          return (
+            <div key="continue" className="section">
+              <div className="section-title">Continue Watching</div>
+              <div className="cards-grid">
+                {inProgress.map((item) => {
+                  const pk =
+                    item.media_type === "movie"
+                      ? `movie_${item.id}`
+                      : `tv_${item.id}_s${item.season}e${item.episode}`;
+                  const r = getRating(item);
+                  const restr = itemRestricted(item);
+                  return (
+                    <MediaCard
+                      key={`${item.media_type}_${item.id}`}
+                      item={item}
+                      onClick={() => onSelect(item)}
+                      progress={progress[pk] || 0}
+                      watched={watched}
+                      onMarkWatched={onMarkWatched}
+                      onMarkUnwatched={onMarkUnwatched}
+                      ageRating={r.cert}
+                      restricted={restr}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          );
+        }
+
+        if (id === "similar") {
+          if (!similarSource || similarItems.length === 0) return null;
+          return (
+            <TrendingCarousel
+              key="similar"
+              items={similarItems}
+              title="Similar to"
+              titleHighlight={similarSource.title || similarSource.name}
+              onSelect={onSelect}
+              ratingsMap={enrichedRatingsMap}
+            />
+          );
+        }
+
+        if (id === "trendingMovies") {
+          if (trendingMovieItems.length === 0) return null;
+          return (
+            <TrendingCarousel
+              key="trendingMovies"
+              items={trendingMovieItems}
+              title="Trending Movies"
+              onSelect={onSelect}
+              ratingsMap={enrichedRatingsMap}
+            />
+          );
+        }
+
+        if (id === "trendingTV") {
+          if (trendingTVItems.length === 0) return null;
+          return (
+            <TrendingCarousel
+              key="trendingTV"
+              items={trendingTVItems}
+              title="Trending Series"
+              onSelect={onSelect}
+              ratingsMap={enrichedRatingsMap}
+            />
+          );
+        }
+
+        if (id === "topRated") {
+          if (topRatedItems.length === 0) return null;
+          return (
+            <TrendingCarousel
+              key="topRated"
+              items={topRatedItems}
+              title="Top Rated"
+              onSelect={onSelect}
+              ratingsMap={enrichedRatingsMap}
+            />
+          );
+        }
+
+        return null;
+      })}
     </div>
   );
 }

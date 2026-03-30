@@ -2,7 +2,9 @@ export const StreambertLogo = ({ style }) => (
   <img
     src="./logo.svg"
     alt="Streambert"
-    style={{ width: "100%", height: "auto", display: "block", ...style }}
+    width="44"
+    height="44"
+    style={{ width: "100%", height: "100%", display: "block", ...style }}
   />
 );
 

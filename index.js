@@ -23,8 +23,9 @@ app.commandLine.appendSwitch(
 );
 // Run the network stack in the browser process → one less utility process
 app.commandLine.appendSwitch("enable-features", "NetworkServiceInProcess2");
-// More aggressive memory management: smaller caches, earlier GC pressure
-app.commandLine.appendSwitch("enable-low-end-device-mode");
+// NOTE: enable-low-end-device-mode removed, it cuts the GPU texture tile budget
+// and causes visible seams/stripes/dots on large images.
+
 // Cap disk cache and limit renderer processes (prevents RAM growth on multi-page navigation)
 app.commandLine.appendSwitch("disk-cache-size", String(80 * 1024 * 1024));
 app.commandLine.appendSwitch("renderer-process-limit", "3");
