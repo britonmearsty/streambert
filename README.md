@@ -101,14 +101,22 @@ Project Root
 ├── README.md
 ├── public
 │   ├── icon.png
+│   ├── installer-sidebar.bmp
 │   └── logo.svg
 ├── screenshots
 │   ├── adblock.png
 │   ├── anime.png
+│   ├── api-settings_tmdb.png
+│   ├── application_tmdb.png
 │   ├── download.png
 │   ├── icon.png
 │   ├── movie.png
+│   ├── personal-use_tmdb.png
 │   ├── series.png
+│   ├── setup.png
+│   ├── signup_tmdb.png
+│   ├── subs.png
+│   ├── token_tmdb.png
 │   └── trending.png
 └── src
     ├── App.jsx
@@ -117,13 +125,25 @@ Project Root
     │   ├── BlockedStatsModal.jsx
     │   ├── CloseConfirmModal.jsx
     │   ├── DownloadModal.jsx
+    │   ├── ErrorBoundary.jsx
     │   ├── Icons.jsx
+    │   ├── KeyboardShortcutsModal.jsx
     │   ├── MediaCard.jsx
     │   ├── SearchModal.jsx
     │   ├── SetupScreen.jsx
     │   ├── Sidebar.jsx
+    │   ├── SubtitleDownloaderModal.jsx
     │   ├── TrailerModal.jsx
-    │   └── TrendingCarousel.jsx
+    │   ├── TrendingCarousel.jsx
+    │   ├── UpdateModal.jsx
+    │   └── WindowTitlebar.jsx
+    ├── ipc
+    │   ├── allmanga.js
+    │   ├── blockStats.js
+    │   ├── downloads.js
+    │   ├── player.js
+    │   ├── storage.js
+    │   └── subtitles.js
     ├── pages
     │   ├── DownloadsPage.jsx
     │   ├── HomePage.jsx
@@ -136,14 +156,20 @@ Project Root
     │   └── fonts
     │       ├── bebas-neue-regular.woff2
     │       ├── dm-sans-300.woff2
-    │       ├── dm-sans-300italic.woff2
     │       ├── dm-sans-500.woff2
     │       ├── dm-sans-600.woff2
     │       └── dm-sans-regular.woff2
     └── utils
         ├── ageRating.js
+        ├── aniSkip.js
         ├── api.js
+        ├── appearance.js
+        ├── backup.js
+        ├── episodeMappings.js
+        ├── homeLayout.js
         ├── storage.js
+        ├── subtitles.js
+        ├── updates.js
         ├── useBlockedStats.js
         └── useRatings.js
 ```
