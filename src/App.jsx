@@ -120,8 +120,6 @@ export default function App() {
       // Only re-check entries older than 12 h
       const cache = storage.get(STORAGE_KEYS.EPISODE_RELEASE_CACHE) || {};
       const now = Date.now();
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
       const CACHE_TTL = 12 * 60 * 60 * 1000;
       const toCheck = tvSeries.filter(
         (s) => !cache[s.id] || now - (cache[s.id].checkedAt || 0) > CACHE_TTL,
@@ -151,18 +149,26 @@ export default function App() {
               if (cancelled) return;
 
               const prev = cache[series.id] || {};
-              const nextEp = data.next_episode_to_air;
-              const nextDate = nextEp?.air_date || null;
               const lastEp = data.last_episode_to_air;
               const lastDate = lastEp?.air_date || null;
               const isFirstCheck = !prev.checkedAt;
 
+              // Parse air_date strings as local midnight to avoid UTC offset issues
+              const parseLocalDate = (d) => {
+                if (!d) return null;
+                const [y, m, day] = d.split("-").map(Number);
+                return new Date(y, m - 1, day);
+              };
+
+              const todayLocal = new Date();
+              todayLocal.setHours(0, 0, 0, 0);
+              const sevenDaysAgo = new Date(todayLocal);
+              sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
               if (isFirstCheck) {
-                // First time seeing this series: notify if the latest episode
-                // aired in the last 7 days (i.e. something recent to watch)
-                const sevenDaysAgo = new Date(today);
-                sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-                if (lastDate && new Date(lastDate) >= sevenDaysAgo) {
+                // First time: notify if latest episode aired in last 7 days
+                const lastParsed = parseLocalDate(lastDate);
+                if (lastParsed && lastParsed >= sevenDaysAgo) {
                   newEpisodeEntries.push({
                     title:
                       series.title ||
@@ -175,34 +181,48 @@ export default function App() {
                   });
                 }
               } else {
-                // Subsequent checks: notify only when a previously-future episode has now become available (or disappeared = aired)
-                const prevWasFuture =
-                  prev.nextEpDate && new Date(prev.nextEpDate) > today;
-                const nowAvailable = nextDate && new Date(nextDate) <= today;
-                const disappeared = prev.nextEpDate && !nextDate;
+                // Subsequent checks: notify when last_episode_to_air changed
+                // (new episode aired) compared to what we cached.
+                // Migration: old cache entries only have nextEpDate, not lastEpDate.
+                // In that case treat as first check to avoid false positives.
+                const prevLastDate = prev.lastEpDate ?? null;
+                const isMigratingOldCache =
+                  prev.checkedAt && prevLastDate === null;
 
-                if (
-                  (prevWasFuture &&
-                    nowAvailable &&
-                    prev.nextEpDate !== nextDate) ||
-                  (prevWasFuture && disappeared)
-                ) {
-                  // For disappeared (aired) use last_episode; otherwise use next
-                  const ep = disappeared ? lastEp : nextEp;
-                  newEpisodeEntries.push({
-                    title:
-                      series.title ||
-                      series.name ||
-                      data.name ||
-                      "Unknown series",
-                    season: ep?.season_number ?? null,
-                    id: series.id,
-                    seriesItem: series,
-                  });
+                if (isMigratingOldCache) {
+                  // Just update the cache with lastEpDat
+                } else {
+                  const lastParsed = parseLocalDate(lastDate);
+                  const prevParsed = parseLocalDate(prevLastDate);
+
+                  const isNewEpisode =
+                    lastDate &&
+                    lastDate !== prevLastDate &&
+                    lastParsed &&
+                    lastParsed >= sevenDaysAgo &&
+                    (!prevParsed || lastParsed > prevParsed);
+
+                  if (isNewEpisode) {
+                    newEpisodeEntries.push({
+                      title:
+                        series.title ||
+                        series.name ||
+                        data.name ||
+                        "Unknown series",
+                      season: lastEp?.season_number ?? null,
+                      id: series.id,
+                      seriesItem: series,
+                    });
+                  }
                 }
               }
 
-              cache[series.id] = { nextEpDate: nextDate, checkedAt: now };
+              cache[series.id] = {
+                lastEpDate: lastDate,
+                // keep nextEpDate for reference but don't use it for detection
+                nextEpDate: data.next_episode_to_air?.air_date || null,
+                checkedAt: now,
+              };
             } catch {}
           }),
         );

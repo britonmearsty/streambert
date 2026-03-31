@@ -397,7 +397,7 @@ export default function TVPage({
   const [dubMode, setDubMode] = useState(
     () => storage.get("allmangaDubMode") || "sub",
   );
-  // 9anime async URL resolution
+  // async URL resolution
   const [resolvedPlayerUrl, setResolvedPlayerUrl] = useState(null);
   const [resolvingUrl, setResolvingUrl] = useState(false);
   const [resolveError, setResolveError] = useState(null);
@@ -1384,7 +1384,7 @@ export default function TVPage({
                     </span>
                   </div>
                 )}
-                {/* 9anime: error if lookup failed */}
+                {/* error if lookup failed */}
                 {isAsync && resolveError && !resolvingUrl && (
                   <div
                     style={{

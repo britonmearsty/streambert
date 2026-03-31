@@ -55,8 +55,9 @@ export const STORAGE_KEYS = {
   // Subtitle settings
   SUBTITLE_ENABLED: "subtitleDownload",
   SUBTITLE_LANG: "subtitleLang",
-  // NOTE: SUBDL_API_KEY and API_KEY are stored encrypted via secureStorage
+  // NOTE: SUBDL_API_KEY, WYZIE_API_KEY and API_KEY are stored encrypted via secureStorage
   SUBDL_API_KEY: "subdlApiKey",
+  WYZIE_API_KEY: "wyzieApiKey",
   // Appearance & behaviour
   ACCENT_COLOR: "accentColor",
   FONT_SIZE: "fontSize",

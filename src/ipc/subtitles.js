@@ -97,7 +97,15 @@ function register({ getDownloads, saveDownloads }) {
     "search-subtitles",
     async (
       _,
-      { tmdbId, mediaType, season, episode, languages, subdlApiKey },
+      {
+        tmdbId,
+        mediaType,
+        season,
+        episode,
+        languages,
+        subdlApiKey,
+        wyzieApiKey,
+      },
     ) => {
       function toSubDLLang(lang) {
         if (!lang) return "";
@@ -171,12 +179,24 @@ function register({ getDownloads, saveDownloads }) {
             params.set("season", String(season));
           if (mediaType === "tv" && episode != null)
             params.set("episode", String(episode));
-          const res = await fetchWithTimeout(
-            `https://subs.wyzie.ru/search?${params}`,
-            {},
-            12000,
-          );
-          if (!res.ok) return { ok: false, error: `Wyzie error ${res.status}` };
+
+          if (wyzieApiKey) params.set("key", wyzieApiKey);
+
+          const baseUrl = wyzieApiKey
+            ? "https://sub.wyzie.io/search"
+            : "https://subs.wyzie.ru/search";
+
+          const res = await fetchWithTimeout(`${baseUrl}?${params}`, {}, 12000);
+          if (!res.ok) {
+            if (res.status === 401 || res.status === 403) {
+              return {
+                ok: false,
+                error: `Wyzie API key invalid or expired (${res.status})`,
+                wyzie_auth_error: true,
+              };
+            }
+            return { ok: false, error: `Wyzie error ${res.status}` };
+          }
           const data = await res.json();
           const results = (Array.isArray(data) ? data : [])
             .filter((r) => r.url)

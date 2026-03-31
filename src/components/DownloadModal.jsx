@@ -12,6 +12,7 @@ import {
   sourceBadgeStyle,
   sourceBadgeLabel,
 } from "../utils/subtitles";
+import WyzieKeyModal from "./WyzieKeyModal";
 
 // ── Subtitle Browser (standalone component to avoid re-mount on parent re-render) ──
 export function SubtitleBrowser({
@@ -20,6 +21,7 @@ export function SubtitleBrowser({
   season,
   episode,
   subdlApiKey,
+  wyzieApiKey,
   selectedSubs,
   setSelectedSubs,
   onClose,
@@ -41,6 +43,7 @@ export function SubtitleBrowser({
         episode,
         languages: lang || "",
         subdlApiKey,
+        wyzieApiKey,
       });
       if (!res.ok) {
         const errMsg = res.error || "Search failed";
@@ -396,10 +399,18 @@ export default function DownloadModal({
       storage.get(STORAGE_KEYS.SUBTITLE_ENABLED) !== "0",
   );
   const [subdlApiKey, setSubdlApiKey] = useState("");
+  const [wyzieApiKey, setWyzieApiKey] = useState(null); // null = not yet loaded
+  const [showWyzieSetup, setShowWyzieSetup] = useState(false);
   useEffect(() => {
     let mounted = true;
-    secureStorage.get(STORAGE_KEYS.SUBDL_API_KEY).then((val) => {
-      if (mounted && val) setSubdlApiKey(val);
+    Promise.all([
+      secureStorage.get(STORAGE_KEYS.SUBDL_API_KEY),
+      secureStorage.get(STORAGE_KEYS.WYZIE_API_KEY),
+    ]).then(([subdl, wyzie]) => {
+      if (!mounted) return;
+      if (subdl) setSubdlApiKey(subdl);
+      const wyzieKey = wyzie || "";
+      setWyzieApiKey(wyzieKey);
     });
     return () => {
       mounted = false;
@@ -453,6 +464,7 @@ export default function DownloadModal({
           episode,
           languages: lang,
           subdlApiKey,
+          wyzieApiKey: wyzieApiKey || "",
         });
         if (!res.ok) {
           const errMsg = res.error || "Search failed";
@@ -476,14 +488,18 @@ export default function DownloadModal({
         setSubSearching(false);
       }
     },
-    [canSearchOS, tmdbId, mediaType, season, episode, subdlApiKey],
+    [canSearchOS, tmdbId, mediaType, season, episode, subdlApiKey, wyzieApiKey],
   );
 
   useEffect(() => {
-    if (m3u8Url && subEnabled && canSearchOS) {
-      searchSubtitles(defaultLang);
+    if (!m3u8Url || !subEnabled || !canSearchOS) return;
+    if (wyzieApiKey === null) return; // still loading
+    if (!wyzieApiKey && !subdlApiKey) {
+      setShowWyzieSetup(true);
+      return;
     }
-  }, [m3u8Url, subEnabled]);
+    searchSubtitles(defaultLang);
+  }, [m3u8Url, subEnabled, wyzieApiKey]);
 
   const pickBinaryFolder = async () => {
     const folder = await window.electron.pickFolder();
@@ -676,6 +692,15 @@ export default function DownloadModal({
   // ── Main modal ─────────────────────────────────────────────────────────────
   return (
     <>
+      {showWyzieSetup && (
+        <WyzieKeyModal
+          onDone={(key) => {
+            setWyzieApiKey(key);
+            setShowWyzieSetup(false);
+          }}
+          onSkip={() => setShowWyzieSetup(false)}
+        />
+      )}
       <div className="modal-backdrop" onClick={onClose}>
         <div className="download-modal" onClick={(e) => e.stopPropagation()}>
           <div className="download-modal-header">
@@ -738,8 +763,14 @@ export default function DownloadModal({
                       const next = !subEnabled;
                       setSubEnabled(next);
                       storage.set(STORAGE_KEYS.SUBTITLE_ENABLED, next ? 1 : 0);
-                      if (next && !subResults && canSearchOS)
-                        searchSubtitles(defaultLang);
+                      if (next && canSearchOS) {
+                        // Show Wyzie setup if no key set (and no SubDL key either)
+                        if (!wyzieApiKey && !subdlApiKey) {
+                          setShowWyzieSetup(true);
+                        } else if (!subResults) {
+                          searchSubtitles(defaultLang);
+                        }
+                      }
                     }}
                     title={
                       subEnabled
@@ -1147,6 +1178,7 @@ export default function DownloadModal({
           season={season}
           episode={episode}
           subdlApiKey={subdlApiKey}
+          wyzieApiKey={wyzieApiKey || ""}
           selectedSubs={selectedSubs}
           setSelectedSubs={setSelectedSubs}
           onClose={() => setShowBrowser(false)}
