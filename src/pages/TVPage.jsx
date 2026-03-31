@@ -1360,7 +1360,7 @@ export default function TVPage({
                 )}
               </div>
               <div className="player-wrap" ref={playerWrapRef}>
-                {/* Universal source-loading overlay – shown instantly on every source/episode switch */}
+                {/* Universal source-loading overlay, shown instantly on every source/episode switch */}
                 {webviewLoading && !resolveError && (
                   <div
                     style={{

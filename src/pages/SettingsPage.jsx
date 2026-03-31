@@ -1310,7 +1310,7 @@ function LibraryPrivacySection() {
 
   const SORT_OPTIONS = [
     { value: "manual", label: "Custom order" },
-    { value: "title", label: "Title A–Z" },
+    { value: "title", label: "Title A-Z" },
     { value: "rating", label: "Top rated" },
     { value: "year", label: "Newest first" },
   ];

@@ -29,7 +29,7 @@ const MediaCard = memo(function MediaCard({
   today.setHours(0, 0, 0, 0);
   const isUnreleased = rawDate ? new Date(rawDate) > today : false;
 
-  // Build watched key – for TV cards from Continue Watching we get season/episode
+  // Build watched key for TV cards from Continue Watching we get season/episode
   const watchedKey = isTV
     ? item.season != null && item.episode != null
       ? `tv_${item.id}_s${item.season}e${item.episode}`

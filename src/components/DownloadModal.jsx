@@ -51,7 +51,7 @@ export function SubtitleBrowser({
           errMsg.toLowerCase().includes("cannot consume");
         setBrowseError(
           is403
-            ? "API error 403 – your OpenSubtitles API key is missing or invalid. Add a valid key in Settings."
+            ? "API error 403 - your SubDL or Wyzie API key is missing or invalid. Add a valid key in Settings."
             : errMsg,
         );
         setBrowseResults([]);
@@ -472,7 +472,7 @@ export default function DownloadModal({
             errMsg.toLowerCase().includes("cannot consume");
           setSubSearchError(
             is403
-              ? "API error 403 – your OpenSubtitles API key is missing or invalid. Add a valid key in Settings."
+              ? "API error 403 - your SubDL or Wyzie API key is missing or invalid. Add a valid key in Settings."
               : errMsg,
           );
           setSubResults([]);

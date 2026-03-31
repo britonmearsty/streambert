@@ -19,7 +19,7 @@ const _tmdbCache = new Map(); // key → { data, expiresAt }
 const TMDB_CACHE_TTL = 5 * 60 * 1000;
 
 // ── Request queue (max 4 concurrent TMDB fetches) ────────────────────────────
-// Prevents bursts of 10–20 parallel requests from carousel/similar-rows rapid
+// Prevents bursts of 10-20 parallel requests from carousel/similar-rows rapid
 // navigation from hammering the API and triggering rate-limit responses.
 let _inflight = 0;
 const MAX_INFLIGHT = 4;
@@ -85,10 +85,6 @@ export const tmdbFetch = async (path, apiKey) => {
 
   return data;
 };
-
-export const videasyMovieUrl = (id) => `https://player.videasy.net/movie/${id}`;
-export const videasyTVUrl = (id, season, episode) =>
-  `https://player.videasy.net/tv/${id}/${season}/${episode}`;
 
 // ── Player Sources ────────────────────────────────────────────────────────────
 // supportsProgress: true = executeJavaScript tracking works for this source

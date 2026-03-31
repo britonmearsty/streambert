@@ -96,8 +96,9 @@ export function formatBytes(bytes) {
 // All methods are async. Non-Electron environments silently fall back to no-op.
 //
 // Sensitive keys managed here (NOT stored in localStorage):
-//   "apikey"      – TMDB API key
-//   "subdlApiKey" – SubDL API key
+//   "apikey"      - TMDB API key
+//   "subdlApiKey" - SubDL API key
+//   "wyzieApiKey" - Wyzie API key
 
 const _isElectronSecure =
   typeof window !== "undefined" && !!window.electron?.secureGet;

@@ -34,7 +34,7 @@ export default function LibraryPage({
 
   const sortLabels = {
     manual: "Custom order",
-    title: "A–Z",
+    title: "A-Z",
     rating: "Top rated",
     year: "Newest first",
   };

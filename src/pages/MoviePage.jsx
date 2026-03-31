@@ -767,7 +767,7 @@ export default function MoviePage({
       {playing && !restricted && !isUnreleased && (
         <div className="section">
           <div className="player-wrap" ref={playerWrapRef}>
-            {/* Universal source-loading overlay – shown instantly on every source/item switch */}
+            {/* Universal source-loading overlay, shown instantly on every source/item switch */}
             {webviewLoading && !resolveError && (
               <div
                 style={{
