@@ -12,7 +12,6 @@ import {
   sourceBadgeStyle,
   sourceBadgeLabel,
 } from "../utils/subtitles";
-import WyzieKeyModal from "./WyzieKeyModal";
 
 // ── Subtitle Browser (standalone component to avoid re-mount on parent re-render) ──
 export function SubtitleBrowser({
@@ -400,7 +399,7 @@ export default function DownloadModal({
   );
   const [subdlApiKey, setSubdlApiKey] = useState("");
   const [wyzieApiKey, setWyzieApiKey] = useState(null); // null = not yet loaded
-  const [showWyzieSetup, setShowWyzieSetup] = useState(false);
+
   useEffect(() => {
     let mounted = true;
     Promise.all([
@@ -494,10 +493,7 @@ export default function DownloadModal({
   useEffect(() => {
     if (!m3u8Url || !subEnabled || !canSearchOS) return;
     if (wyzieApiKey === null) return; // still loading
-    if (!wyzieApiKey && !subdlApiKey) {
-      setShowWyzieSetup(true);
-      return;
-    }
+    if (!wyzieApiKey && !subdlApiKey) return;
     searchSubtitles(defaultLang);
   }, [m3u8Url, subEnabled, wyzieApiKey]);
 
@@ -676,7 +672,7 @@ export default function DownloadModal({
                   style={{ fontSize: 12, color: "var(--text3)" }}
                   onClick={() => {
                     onClose();
-                    onOpenSettings();
+                    onOpenSettings("downloads");
                   }}
                 >
                   <SettingsIcon /> Open Settings
@@ -692,15 +688,6 @@ export default function DownloadModal({
   // ── Main modal ─────────────────────────────────────────────────────────────
   return (
     <>
-      {showWyzieSetup && (
-        <WyzieKeyModal
-          onDone={(key) => {
-            setWyzieApiKey(key);
-            setShowWyzieSetup(false);
-          }}
-          onSkip={() => setShowWyzieSetup(false)}
-        />
-      )}
       <div className="modal-backdrop" onClick={onClose}>
         <div className="download-modal" onClick={(e) => e.stopPropagation()}>
           <div className="download-modal-header">
@@ -764,11 +751,8 @@ export default function DownloadModal({
                       setSubEnabled(next);
                       storage.set(STORAGE_KEYS.SUBTITLE_ENABLED, next ? 1 : 0);
                       if (next && canSearchOS) {
-                        // Show Wyzie setup if no key set (and no SubDL key either)
-                        if (!wyzieApiKey && !subdlApiKey) {
-                          setShowWyzieSetup(true);
-                        } else if (!subResults) {
-                          searchSubtitles(defaultLang);
+                        if (wyzieApiKey || subdlApiKey) {
+                          if (!subResults) searchSubtitles(defaultLang);
                         }
                       }
                     }}
@@ -812,6 +796,50 @@ export default function DownloadModal({
                         No TMDB ID: Subtitle search unavailable
                       </div>
                     )}
+                    {canSearchOS &&
+                      !wyzieApiKey &&
+                      !subdlApiKey &&
+                      wyzieApiKey !== null && (
+                        <div
+                          style={{
+                            fontSize: 12,
+                            color: "var(--text2)",
+                            background: "var(--surface2)",
+                            border: "1px solid var(--border)",
+                            borderRadius: 8,
+                            padding: "10px 12px",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 6,
+                          }}
+                        >
+                          <span>
+                            <span
+                              style={{ color: "var(--red)", fontWeight: 600 }}
+                            >
+                              No subtitle API key set.
+                            </span>{" "}
+                            Add/Generate a Wyzie or SubDL key in Settings to
+                            enable subtitle search.
+                          </span>
+                          {onOpenSettings && (
+                            <button
+                              className="btn btn-ghost"
+                              style={{
+                                alignSelf: "flex-start",
+                                padding: "2px 8px",
+                                fontSize: 11,
+                              }}
+                              onClick={() => {
+                                onClose();
+                                onOpenSettings("subtitles");
+                              }}
+                            >
+                              <SettingsIcon /> Open Settings → Subtitles
+                            </button>
+                          )}
+                        </div>
+                      )}
                     {subSearching && (
                       <div
                         style={{
@@ -855,7 +883,7 @@ export default function DownloadModal({
                             style={{ padding: "2px 8px", fontSize: 11 }}
                             onClick={() => {
                               onClose();
-                              onOpenSettings();
+                              onOpenSettings("subtitles");
                             }}
                           >
                             Open Settings

@@ -1718,48 +1718,6 @@ function SubtitleSettingsSection() {
                   Get free key ↗
                 </button>
               ) : null}
-              {hasWyzieKey && !wyzieClearConfirm && (
-                <button
-                  className="btn btn-ghost"
-                  style={{
-                    padding: "6px 12px",
-                    fontSize: 12,
-                    color: "var(--text3)",
-                  }}
-                  onClick={() => setWyzieClearConfirm(true)}
-                  title="Clear Wyzie key"
-                >
-                  Clear
-                </button>
-              )}
-              {hasWyzieKey && wyzieClearConfirm && (
-                <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 11, color: "var(--text3)" }}>
-                    Remove key?
-                  </span>
-                  <button
-                    className="btn btn-ghost"
-                    style={{
-                      padding: "4px 10px",
-                      fontSize: 11,
-                      color: "#ff6060",
-                    }}
-                    onClick={() => {
-                      setWyzieApiKey("");
-                      setWyzieClearConfirm(false);
-                    }}
-                  >
-                    Yes, remove
-                  </button>
-                  <button
-                    className="btn btn-ghost"
-                    style={{ padding: "4px 10px", fontSize: 11 }}
-                    onClick={() => setWyzieClearConfirm(false)}
-                  >
-                    Cancel
-                  </button>
-                </span>
-              )}
             </div>
             {wyzieError && (
               <div
@@ -2787,7 +2745,11 @@ function SettingsTopBar({ sectionRefs, contentRef }) {
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
-export default function SettingsPage({ apiKey, onChangeApiKey }) {
+export default function SettingsPage({
+  apiKey,
+  onChangeApiKey,
+  initialSection,
+}) {
   const [downloadPath, setDownloadPath] = useState(
     () => storage.get(STORAGE_KEYS.DOWNLOAD_PATH) || "",
   );
@@ -2827,6 +2789,18 @@ export default function SettingsPage({ apiKey, onChangeApiKey }) {
 
   // Ref for find-in-page search scope
   const contentRef = useRef(null);
+
+  // Scroll to initial section if provided (e.g. when navigating from a modal)
+  useEffect(() => {
+    if (!initialSection) return;
+    const el = sectionRefs[initialSection]?.current;
+    if (!el) return;
+    // Small delay so layout is complete before scrolling
+    const t = setTimeout(() => {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 120);
+    return () => clearTimeout(t);
+  }, []);
 
   // Age Rating
   const [ratingCountry, setRatingCountry] = useState(

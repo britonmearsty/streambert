@@ -885,7 +885,9 @@ export default function App() {
                 progress={progress}
                 saveProgress={saveProgress}
                 onBack={() => navigate("home")}
-                onSettings={() => navigate("settings")}
+                onSettings={(section) =>
+                  navigate("settings", { section: section || null })
+                }
                 onDownloadStarted={handleDownloadStarted}
                 watched={watched}
                 onMarkWatched={markWatched}
@@ -905,7 +907,9 @@ export default function App() {
                 progress={progress}
                 saveProgress={saveProgress}
                 onBack={() => navigate("home")}
-                onSettings={() => navigate("settings")}
+                onSettings={(section) =>
+                  navigate("settings", { section: section || null })
+                }
                 onDownloadStarted={handleDownloadStarted}
                 watched={watched}
                 onMarkWatched={markWatched}
@@ -927,7 +931,11 @@ export default function App() {
               />
             )}
             {page === "settings" && (
-              <SettingsPage apiKey={apiKey} onChangeApiKey={changeApiKey} />
+              <SettingsPage
+                apiKey={apiKey}
+                onChangeApiKey={changeApiKey}
+                initialSection={selected?.section}
+              />
             )}
             {page === "downloads" && (
               <DownloadsPage
@@ -942,6 +950,9 @@ export default function App() {
                 highlightId={highlightDownload}
                 onClearHighlight={() => setHighlightDownload(null)}
                 onSelect={handleSelectResult}
+                onSettings={(section) =>
+                  navigate("settings", { section: section || null })
+                }
                 onUpdateDownload={(id, updates) =>
                   setDownloads((prev) =>
                     prev.map((d) => (d.id === id ? { ...d, ...updates } : d)),

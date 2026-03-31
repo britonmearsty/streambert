@@ -69,6 +69,7 @@ export default function DownloadsPage({
   onClearHighlight,
   onSelect,
   onUpdateDownload,
+  onSettings,
 }) {
   const [fileExistsCache, setFileExistsCache] = useState({});
   const [localFiles, setLocalFiles] = useState(
@@ -210,6 +211,7 @@ export default function DownloadsPage({
         <SubtitleDownloaderModal
           dl={subtitleModalDl}
           onClose={() => setSubtitleModalDl(null)}
+          onOpenSettings={onSettings}
           onSubtitlesSaved={(newPaths) => {
             const existing = subtitleModalDl.subtitlePaths || [];
             const existingIds = new Set(

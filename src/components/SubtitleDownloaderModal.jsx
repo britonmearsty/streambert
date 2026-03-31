@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { TrashIcon, SubtitlesIcon } from "./Icons";
+import { TrashIcon, SubtitlesIcon, SettingsIcon } from "./Icons";
 import { storage, STORAGE_KEYS, secureStorage } from "../utils/storage";
 import { SUBTITLE_LANGUAGES } from "../utils/subtitles";
-import WyzieKeyModal from "./WyzieKeyModal";
 
 // ── Subtitle Downloader Modal (for retroactive subtitle download) ──────────────
 export default function SubtitleDownloaderModal({
@@ -10,11 +9,11 @@ export default function SubtitleDownloaderModal({
   onClose,
   onSubtitlesSaved,
   onSubtitleDeleted,
+  onOpenSettings,
 }) {
   const defaultLang = storage.get(STORAGE_KEYS.SUBTITLE_LANG) || "en";
   const [subdlApiKey, setSubdlApiKey] = useState(null); // null = not yet loaded
   const [wyzieApiKey, setWyzieApiKey] = useState(null); // null = not yet loaded
-  const [showWyzieSetup, setShowWyzieSetup] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -24,12 +23,7 @@ export default function SubtitleDownloaderModal({
     ]).then(([subdl, wyzie]) => {
       if (!mounted) return;
       setSubdlApiKey(subdl || "");
-      const wyzieKey = wyzie || "";
-      setWyzieApiKey(wyzieKey);
-      // If no Wyzie key and no SubDL key, show setup prompt
-      if (!wyzieKey && !subdl) {
-        setShowWyzieSetup(true);
-      }
+      setWyzieApiKey(wyzie || "");
     });
     return () => {
       mounted = false;
@@ -90,11 +84,10 @@ export default function SubtitleDownloaderModal({
   );
 
   useEffect(() => {
-    // Wait until both keys have been loaded from secure storage before searching
     if (subdlApiKey === null || wyzieApiKey === null) return;
-    if (showWyzieSetup) return; // wait for setup to complete
+    if (!subdlApiKey && !wyzieApiKey) return;
     doSearch(langFilter);
-  }, [subdlApiKey, wyzieApiKey, showWyzieSetup]);
+  }, [subdlApiKey, wyzieApiKey]);
 
   const handleDownload = async () => {
     if (!selectedSubs.length || !dl.filePath) return;
@@ -146,15 +139,6 @@ export default function SubtitleDownloaderModal({
 
   return (
     <>
-      {showWyzieSetup && (
-        <WyzieKeyModal
-          onDone={(key) => {
-            setWyzieApiKey(key);
-            setShowWyzieSetup(false);
-          }}
-          onSkip={() => setShowWyzieSetup(false)}
-        />
-      )}
       <div
         style={{
           position: "fixed",
@@ -389,6 +373,46 @@ export default function SubtitleDownloaderModal({
 
           {/* ── Results list ── */}
           <div style={{ flex: 1, overflowY: "auto" }}>
+            {/* No API key banner */}
+            {!wyzieApiKey && !subdlApiKey && wyzieApiKey !== null && (
+              <div
+                style={{
+                  margin: "16px 20px",
+                  padding: "12px 14px",
+                  background: "var(--surface2)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 8,
+                  fontSize: 13,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                }}
+              >
+                <span>
+                  <span style={{ color: "var(--red)", fontWeight: 600 }}>
+                    No subtitle API key set.
+                  </span>{" "}
+                  Add/Generate a Wyzie or SubDL key in Settings to search and
+                  download subtitles.
+                </span>
+                {onOpenSettings && (
+                  <button
+                    className="btn btn-ghost"
+                    style={{
+                      alignSelf: "flex-start",
+                      padding: "2px 8px",
+                      fontSize: 11,
+                    }}
+                    onClick={() => {
+                      onClose();
+                      onOpenSettings("subtitles");
+                    }}
+                  >
+                    <SettingsIcon /> Open Settings → Subtitles
+                  </button>
+                )}
+              </div>
+            )}
             {searching && (
               <div
                 style={{
