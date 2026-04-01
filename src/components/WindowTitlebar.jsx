@@ -5,28 +5,31 @@ import { useState, useEffect } from "react";
 export default function WindowTitlebar() {
   const [maximized, setMaximized] = useState(false);
 
-  // Poll maximized state (Electron doesn't push this to the renderer)
+  // Defined outside useEffect so toggleMaximize can also call it.
+  // Syncs both React state and the html[data-maximized] attribute together.
+  const apply = (v) => {
+    setMaximized(v);
+    if (v) {
+      document.documentElement.setAttribute("data-maximized", "1");
+    } else {
+      document.documentElement.removeAttribute("data-maximized");
+    }
+  };
+
   useEffect(() => {
-    if (!window.electron?.windowIsMaximized) return;
-    let active = true;
-    const poll = () => {
-      if (!active) return;
-      window.electron.windowIsMaximized().then((v) => {
-        if (active) setMaximized(v);
-      });
-      setTimeout(poll, 500);
-    };
-    poll();
+    if (!window.electron) return;
+
+    window.electron.windowIsMaximized?.().then(apply);
+    const handler = window.electron.onWindowMaximize?.(apply);
+
     return () => {
-      active = false;
+      window.electron.offWindowMaximize?.(handler);
+      document.documentElement.removeAttribute("data-maximized");
     };
   }, []);
 
   const minimize = () => window.electron?.windowMinimize();
-  const toggleMaximize = () =>
-    window.electron
-      ?.windowToggleMaximize()
-      .then(() => window.electron?.windowIsMaximized().then(setMaximized));
+  const toggleMaximize = () => window.electron?.windowToggleMaximize();
   const close = () => window.electron?.windowClose();
 
   return (
@@ -38,7 +41,7 @@ export default function WindowTitlebar() {
         right: 0,
         height: 32,
         zIndex: 10000,
-        background: "#0d0d0d",
+        background: "var(--bg)",
         borderBottom: "1px solid rgba(255,255,255,0.06)",
         display: "flex",
         alignItems: "center",
@@ -112,7 +115,7 @@ export default function WindowTitlebar() {
                 stroke="currentColor"
                 strokeWidth="1"
                 fill="none"
-                style={{ fill: "#0d0d0d" }}
+                style={{ fill: "var(--bg)" }}
               />
             </svg>
           ) : (

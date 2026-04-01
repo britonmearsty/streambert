@@ -132,6 +132,13 @@ contextBridge.exposeInMainWorld("electron", {
   windowClose: () => ipcRenderer.invoke("window-close"),
   windowIsMaximized: () => ipcRenderer.invoke("window-is-maximized"),
   getPlatform: () => ipcRenderer.invoke("get-platform"),
+  // Push events: main process emits "window-maximized" with a boolean payload
+  onWindowMaximize: (cb) => {
+    const h = (_, v) => cb(v);
+    ipcRenderer.on("window-maximized", h);
+    return h;
+  },
+  offWindowMaximize: (h) => ipcRenderer.removeListener("window-maximized", h),
   getVideoDuration: (filePath) =>
     ipcRenderer.invoke("get-video-duration", filePath),
   setZoomFactor: (factor) => webFrame.setZoomFactor(factor),

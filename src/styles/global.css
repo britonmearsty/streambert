@@ -3564,6 +3564,24 @@ html[data-win-titlebar] .main {
     height: calc(100vh - 32px);
 }
 
+html[data-win-titlebar][data-maximized] body {
+    padding: 8px;
+}
+
+html[data-win-titlebar][data-maximized] .sidebar {
+    top: calc(32px + 8px);
+    left: 8px;
+    bottom: 8px;
+    height: auto;
+}
+
+html[data-win-titlebar][data-maximized] .main {
+    margin-top: calc(32px + 8px);
+    margin-right: 8px;
+    margin-bottom: 8px;
+    height: calc(100vh - 64px);
+}
+
 ::highlight(settings-search) {
     background-color: rgba(255, 193, 7, 0.38);
     color: inherit;
