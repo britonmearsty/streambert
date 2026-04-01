@@ -12,7 +12,7 @@ import { DEFAULT_INVIDIOUS_BASE } from "../components/TrailerModal";
 import { RATING_COUNTRIES } from "../utils/ageRating";
 import { WarningIcon } from "../components/Icons";
 import { checkForUpdates } from "../utils/updates";
-import { HOME_ROWS, loadHomeLayout, saveHomeLayout } from "../utils/homeLayout";
+import { HOME_ROWS, loadHomeLayout } from "../utils/homeLayout";
 import { collectBackupData, restoreBackupData } from "../utils/backup";
 import { formatBytes } from "../utils/storage";
 

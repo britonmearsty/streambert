@@ -8,7 +8,7 @@ import {
   WatchedIcon,
   SubtitlesIcon,
 } from "../components/Icons";
-import { storage, STORAGE_KEYS, isElectron } from "../utils/storage";
+import { storage, isElectron } from "../utils/storage";
 import SubtitleDownloaderModal from "../components/SubtitleDownloaderModal";
 import { imgUrl } from "../utils/api";
 

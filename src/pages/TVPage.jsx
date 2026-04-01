@@ -377,7 +377,7 @@ export default function TVPage({
   const [m3u8Url, setM3u8Url] = useState(null);
   const [interceptedSubs, setInterceptedSubs] = useState([]);
   const [playerSource, setPlayerSource] = useState(
-    () => storage.get("playerSource") || "videasy",
+    () => storage.get("playerSource") || NON_ANIME_DEFAULT_SOURCE,
   );
   const [showSourceMenu, setShowSourceMenu] = useState(false);
   // Derived from playerSource, computed once per render instead of 5-6× inline
@@ -1423,7 +1423,6 @@ export default function TVPage({
                           item.id,
                           playerEp.season,
                           playerEp.episode,
-                          title,
                         )
                   }
                   partition="persist:player"

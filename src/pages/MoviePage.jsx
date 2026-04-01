@@ -76,7 +76,7 @@ export default function MoviePage({
   const [m3u8Url, setM3u8Url] = useState(null);
   const [interceptedSubs, setInterceptedSubs] = useState([]);
   const [playerSource, setPlayerSource] = useState(
-    () => storage.get("playerSource") || "videasy",
+    () => storage.get("playerSource") || NON_ANIME_DEFAULT_SOURCE,
   );
   const progressViaFrames = useMemo(
     () => sourceProgressViaFrames(playerSource),
@@ -824,14 +824,7 @@ export default function MoviePage({
               src={
                 sourceIsAsync(playerSource)
                   ? resolvedPlayerUrl || "about:blank"
-                  : getSourceUrl(
-                      playerSource,
-                      "movie",
-                      item.id,
-                      null,
-                      null,
-                      title,
-                    )
+                  : getSourceUrl(playerSource, "movie", item.id, null, null)
               }
               partition="persist:player"
               allowpopups="false"

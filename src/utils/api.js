@@ -133,7 +133,7 @@ export const PLAYER_SOURCES = [
   },
 ];
 
-export const getSourceUrl = (sourceId, type, id, season, ep, _title) => {
+export const getSourceUrl = (sourceId, type, id, season, ep) => {
   const src =
     PLAYER_SOURCES.find((s) => s.id === sourceId) ?? PLAYER_SOURCES[0];
   return type === "movie" ? src.movieUrl(id) : src.tvUrl(id, season, ep);
@@ -360,7 +360,7 @@ export const isAnimeContent = (item, details) => {
 
 // Default sources
 export const ANIME_DEFAULT_SOURCE = "allmanga";
-export const NON_ANIME_DEFAULT_SOURCE = "videasy";
+export const NON_ANIME_DEFAULT_SOURCE = "vidsrc";
 
 // ── Episode Group fetch (localStorage + in-memory cache, 7-day TTL) ─────────
 // Episode groups almost never change, so we cache aggressively across sessions.
