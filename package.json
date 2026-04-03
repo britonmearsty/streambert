@@ -12,10 +12,9 @@
   "scripts": {
     "dev": "vite build --watch",
     "start": "vite build && electron .",
-    "dist": "vite build && electron-builder",
-    "dist:linux": "vite build && electron-builder --linux",
-    "dist:win": "vite build && electron-builder --win",
-    "dist:mac": "vite build && electron-builder --mac"
+    "dist": "cross-env ELECTRON_DIST=1 vite build && npm run dist:win && npm run dist:linux",
+    "dist:linux": "cross-env ELECTRON_DIST=1 vite build && electron-builder --linux deb && electron-builder --linux AppImage",
+    "dist:win": "cross-env ELECTRON_DIST=1 vite build && electron-builder --win"
   },
   "dependencies": {
     "react": "^18.2.0",
@@ -23,6 +22,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.7.0",
+    "cross-env": "^7.0.3",
     "electron": "^40.4.1",
     "electron-builder": "^26.7.0",
     "terser": "^5.46.0",
