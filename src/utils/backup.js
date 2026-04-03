@@ -19,6 +19,7 @@ export const BACKUP_KEYS = [
   // Player preferences
   "playerSource",
   "allmangaDubMode",
+  "introSkipMode",
   // Other Stuff
   "ageLimit",
   "ratingCountry",

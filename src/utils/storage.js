@@ -68,6 +68,9 @@ export const STORAGE_KEYS = {
   // Notification preferences
   NOTIFY_DOWNLOAD_COMPLETE: "notifyDownloadComplete",
   NOTIFY_NEW_EPISODE: "notifyNewEpisode",
+  // Intro skip (anime only, allmanga source)
+  // Values: "off" | "auto" | "manual"
+  INTRO_SKIP_MODE: "introSkipMode",
   // Cache for new-episode startup check
   EPISODE_RELEASE_CACHE: "episodeReleaseCache",
 };
@@ -116,3 +119,22 @@ export const secureStorage = {
     return window.electron.secureSet(key, value ?? "");
   },
 };
+
+/**
+ * Clears all app caches, Electron browser cache, AniList, EpisodeGroup,
+ * AniSkip, and dlDur_ keys. Single source of truth used by Settings
+ * "Clear Cache" button and post-update cache clearing in App.jsx.
+ */
+export async function clearAppCaches() {
+  if (isElectron) {
+    try {
+      await window.electron.clearAppCache();
+    } catch {}
+  }
+  localStorage.removeItem("streambert_anilistCache");
+  localStorage.removeItem("streambert_episodeGroupCache");
+  localStorage.removeItem("streambert_aniskipCache");
+  for (const key of Object.keys(localStorage)) {
+    if (key.startsWith("dlDur_")) localStorage.removeItem(key);
+  }
+}

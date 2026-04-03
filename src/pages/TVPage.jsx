@@ -48,7 +48,8 @@ import DownloadModal from "../components/DownloadModal";
 import TrailerModal from "../components/TrailerModal";
 import BlockedStatsModal from "../components/BlockedStatsModal";
 import { useBlockedStats } from "../utils/useBlockedStats";
-import { storage } from "../utils/storage";
+import { storage, STORAGE_KEYS } from "../utils/storage";
+import { fetchAniSkipTimings } from "../utils/aniSkip";
 import {
   fetchTVRating,
   isRestricted,
@@ -409,6 +410,12 @@ export default function TVPage({
   // Webview loading overlay
   const [webviewLoading, setWebviewLoading] = useState(false);
   const [menuPos, setMenuPos] = useState(null);
+  // AniSkip
+  const [skipTimings, setSkipTimings] = useState(null); // { intro?, outro? }
+  const [skipPrompt, setSkipPrompt] = useState(null); // "intro" | "outro" | null
+  const [introSkipMode] = useState(
+    () => storage.get(STORAGE_KEYS.INTRO_SKIP_MODE) || "off",
+  );
   const sourceRef = useRef(null);
   const playerWrapRef = useRef(null);
   const webviewRef = useRef(null);
@@ -423,6 +430,7 @@ export default function TVPage({
     () => isAnimeContent(item, details),
     [item.id, details],
   );
+
   const [downloaderFolder, setDownloaderFolder] = useState(
     () => storage.get("downloaderFolder") || "",
   );
@@ -451,6 +459,7 @@ export default function TVPage({
   );
   const autoMarkedRef = useRef(false);
   const lastKnownTimeRef = useRef(0);
+  const durationRef = useRef(0); // tracked for AniSkip progress bar markers
   const seekBackCooldownRef = useRef(0);
 
   useEffect(() => {
@@ -965,6 +974,7 @@ export default function TVPage({
     autoMarkedRef.current = false;
     lastKnownTimeRef.current = 0;
     seekBackCooldownRef.current = 0;
+    durationRef.current = 0;
   }, [currentProgressKey]);
 
   // Show loader instantly when playback starts
@@ -993,7 +1003,8 @@ export default function TVPage({
     };
   }, []);
 
-  // Attach webview load events so we know when the new source has painted
+  // Attach webview load events so we know when the new source has painted.
+  // Also poll for video duration so AniSkip markers appear without waiting for the 5s progress tick.
   useEffect(() => {
     if (!playing) return;
     const wv = webviewRef.current;
@@ -1001,11 +1012,144 @@ export default function TVPage({
     const done = () => setWebviewLoading(false);
     wv.addEventListener("did-finish-load", done);
     wv.addEventListener("did-fail-load", done);
+
+    // Poll up to 30s for video duration (metadata may load after buffering starts)
+    let attempts = 0;
+    const pollDuration = setInterval(async () => {
+      if (durationRef.current > 0 || attempts++ > 30) {
+        clearInterval(pollDuration);
+        return;
+      }
+      try {
+        const dur = await wv.executeJavaScript(
+          `(() => { const v = document.querySelector('video'); return (v && v.duration > 0 && isFinite(v.duration)) ? v.duration : null; })()`,
+        );
+        if (dur) {
+          durationRef.current = dur;
+          // let markers re-render
+          setSkipTimings((t) => (t ? { ...t } : t));
+          clearInterval(pollDuration);
+        }
+      } catch {}
+    }, 1000);
+
     return () => {
       wv.removeEventListener("did-finish-load", done);
       wv.removeEventListener("did-fail-load", done);
+      clearInterval(pollDuration);
     };
   }, [playing, playerSource, item.id, selectedEp?.episode_number]);
+
+  // ── AniSkip: fetch timings when episode changes ───────────────────────────
+  useEffect(() => {
+    setSkipTimings(null);
+    setSkipPrompt(null);
+    if (introSkipMode === "off" || playerSource !== "allmanga" || !isAnime)
+      return;
+    const anilistId = anilistData?.idMal;
+    const epNum = selectedEp?.episode_number;
+    if (!anilistId || !epNum) return;
+
+    let cancelled = false;
+    fetchAniSkipTimings(anilistId, epNum).then((timings) => {
+      if (!cancelled) setSkipTimings(timings);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    anilistData?.idMal,
+    selectedEp?.episode_number,
+    playerSource,
+    isAnime,
+    introSkipMode,
+  ]);
+
+  // ── AniSkip: auto-skip or show manual prompt ─────────────────
+  useEffect(() => {
+    if (
+      introSkipMode === "off" ||
+      !playing ||
+      !skipTimings ||
+      playerSource !== "allmanga"
+    ) {
+      setSkipPrompt(null);
+      return;
+    }
+
+    const interval = setInterval(async () => {
+      const wv = webviewRef.current;
+      if (!wv) return;
+      let ct;
+      try {
+        ct = await wv.executeJavaScript(
+          `(() => { const v = document.querySelector('video'); return v ? v.currentTime : null; })()`,
+        );
+      } catch {
+        return;
+      }
+      if (ct == null) return;
+
+      const { intro, outro } = skipTimings;
+
+      // Check which segment we're in
+      const inIntro = intro && ct >= intro.startTime && ct < intro.endTime - 1;
+      const inOutro = outro && ct >= outro.startTime && ct < outro.endTime - 1;
+      const activeSegment = inIntro ? "intro" : inOutro ? "outro" : null;
+
+      if (!activeSegment) {
+        setSkipPrompt(null);
+        return;
+      }
+
+      if (introSkipMode === "auto") {
+        setSkipPrompt(null);
+        const endTime = skipTimings[activeSegment].endTime;
+        try {
+          await wv.executeJavaScript(
+            `(() => { const v = document.querySelector('video'); if (v) v.currentTime = ${endTime}; })()`,
+          );
+        } catch {}
+      } else {
+        // manual, show prompt
+        setSkipPrompt(activeSegment);
+      }
+    }, 1000);
+
+    return () => {
+      clearInterval(interval);
+      setSkipPrompt(null);
+    };
+  }, [playing, skipTimings, playerSource, introSkipMode]);
+
+  // ── AniSkip: manual skip handler ─────────────────────────────────────────
+  const handleManualSkip = useCallback(async () => {
+    if (!skipPrompt || !skipTimings?.[skipPrompt]) return;
+    const endTime = skipTimings[skipPrompt].endTime;
+    const wv = webviewRef.current;
+    if (!wv) return;
+    try {
+      await wv.executeJavaScript(
+        `(() => { const v = document.querySelector('video'); if (v) v.currentTime = ${endTime}; })()`,
+      );
+    } catch {}
+    setSkipPrompt(null);
+  }, [skipPrompt, skipTimings]);
+
+  // Use webview before-input-event so Enter reaches main-ui before the webview
+  // handles it (avoids the webview's Space/Enter play-pause intercepting it).
+  useEffect(() => {
+    if (!skipPrompt) return;
+    const wv = webviewRef.current;
+    if (!wv) return;
+    const handler = (e) => {
+      if (e.key === "Return" && e.type === "keyDown") {
+        handleManualSkip();
+      }
+    };
+    wv.addEventListener("before-input-event", handler);
+    return () => wv.removeEventListener("before-input-event", handler);
+  }, [skipPrompt, handleManualSkip]);
 
   // ── Auto-track progress + auto-watched every 5s ──────────────────────────
   useEffect(() => {
@@ -1045,6 +1189,7 @@ export default function TVPage({
             `);
           }
           if (result && result.duration > 0) {
+            durationRef.current = result.duration;
             const ct = result.currentTime;
 
             // ── Resolution-change reset detection ──────────────────────────
@@ -1583,21 +1728,114 @@ export default function TVPage({
                 </button>
 
                 {/* Skip controls are injected directly into the webview DOM*/}
+
+                {/* AniSkip manual prompt — rendered in our UI, outside webview */}
+                {skipPrompt && (
+                  <button
+                    onClick={handleManualSkip}
+                    style={{
+                      position: "absolute",
+                      bottom: 24,
+                      right: 24,
+                      zIndex: 50,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: 1,
+                      background: "rgba(0,0,0,0.72)",
+                      border: "1px solid rgba(255,255,255,0.18)",
+                      borderRadius: 8,
+                      color: "white",
+                      cursor: "pointer",
+                      padding: "9px 18px",
+                      backdropFilter: "blur(6px)",
+                      WebkitBackdropFilter: "blur(6px)",
+                      transition: "background 0.15s, border-color 0.15s",
+                      fontFamily: "var(--font-body)",
+                      animation: "slideDown 0.2s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "rgba(229,9,20,0.85)";
+                      e.currentTarget.style.borderColor = "rgba(229,9,20,0.5)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "rgba(0,0,0,0.72)";
+                      e.currentTarget.style.borderColor =
+                        "rgba(255,255,255,0.18)";
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        letterSpacing: 1,
+                      }}
+                    >
+                      SKIP
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 10,
+                        color: "rgba(255,255,255,0.7)",
+                        letterSpacing: 1,
+                      }}
+                    >
+                      {skipPrompt === "intro" ? "INTRO" : "OUTRO"}
+                    </span>
+                  </button>
+                )}
               </div>
 
               {currentProgressKey &&
                 (() => {
                   const epPct = progress[currentProgressKey] || 0;
-                  return epPct > 0 ? (
+                  const dur = durationRef.current;
+                  const hasMarkers =
+                    dur > 0 && (skipTimings?.intro || skipTimings?.outro);
+                  return epPct > 0 || hasMarkers ? (
                     <div className="progress-bar-row">
-                      <div className="progress-bar-outer">
+                      <div
+                        className="progress-bar-outer"
+                        style={{ position: "relative" }}
+                      >
                         <div
                           className="progress-bar-fill"
                           style={{ width: `${Math.min(epPct, 100)}%` }}
                         />
+                        {/* AniSkip intro/outro markers */}
+                        {dur > 0 && skipTimings?.intro && (
+                          <div
+                            title="Intro"
+                            style={{
+                              position: "absolute",
+                              top: 0,
+                              left: `${(skipTimings.intro.startTime / dur) * 100}%`,
+                              width: `${((skipTimings.intro.endTime - skipTimings.intro.startTime) / dur) * 100}%`,
+                              height: "100%",
+                              background: "rgba(251,191,36,0.75)",
+                              borderRadius: 2,
+                              pointerEvents: "none",
+                            }}
+                          />
+                        )}
+                        {dur > 0 && skipTimings?.outro && (
+                          <div
+                            title="Outro"
+                            style={{
+                              position: "absolute",
+                              top: 0,
+                              left: `${(skipTimings.outro.startTime / dur) * 100}%`,
+                              width: `${((skipTimings.outro.endTime - skipTimings.outro.startTime) / dur) * 100}%`,
+                              height: "100%",
+                              background: "rgba(251,191,36,0.75)",
+                              borderRadius: 2,
+                              pointerEvents: "none",
+                            }}
+                          />
+                        )}
                       </div>
                       <span style={{ fontSize: 12, color: "var(--text3)" }}>
-                        {epPct.toFixed(0)}% watched
+                        {epPct > 0 ? `${epPct.toFixed(0)}% watched` : ""}
                       </span>
                     </div>
                   ) : null;

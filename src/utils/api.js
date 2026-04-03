@@ -179,6 +179,7 @@ const ANILIST_QUERY = `
 query ($search: String, $type: MediaType) {
   Media(search: $search, type: $type, sort: SEARCH_MATCH) {
     id
+    idMal
     title { romaji english native }
     description(asHtml: false)
     coverImage { extraLarge large }

@@ -5,6 +5,7 @@ import {
   STORAGE_KEYS,
   secureStorage,
   isElectron,
+  clearAppCaches,
 } from "../utils/storage";
 import { ACCENT_PRESETS, applyAccentColor } from "../utils/appearance";
 import { SUBTITLE_LANGUAGES } from "../utils/subtitles";
@@ -2022,6 +2023,11 @@ const SECTION_NAV = [
       "seconds",
       "mark",
       "auto-watched",
+      "intro",
+      "skip",
+      "aniskip",
+      "anime",
+      "outro",
     ],
   },
   {
@@ -2756,6 +2762,9 @@ export default function SettingsPage({
   const [watchedThreshold, setWatchedThreshold] = useState(
     () => storage.get(STORAGE_KEYS.WATCHED_THRESHOLD) ?? 20,
   );
+  const [introSkipMode, setIntroSkipMode] = useState(
+    () => storage.get(STORAGE_KEYS.INTRO_SKIP_MODE) || "off",
+  );
   const [saved, setSaved] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [resetHovered, setResetHovered] = useState(false);
@@ -2925,14 +2934,7 @@ export default function SettingsPage({
   // ── Clean handlers ─────────────────────────────────────────────────────────
 
   const handleClearCache = async () => {
-    if (isElectron) await window.electron.clearAppCache();
-    // Clear localStorage caches (AniList, Episode Groups, video durations)
-    localStorage.removeItem("streambert_anilistCache");
-    localStorage.removeItem("streambert_episodeGroupCache");
-    // Clear persisted video duration keys (dlDur_*)
-    for (const key of Object.keys(localStorage)) {
-      if (key.startsWith("dlDur_")) localStorage.removeItem(key);
-    }
+    await clearAppCaches();
     setSizes((prev) => ({ ...prev, cache: 0 }));
     return { msg: "✓ Cache cleared successfully" };
   };
@@ -3331,6 +3333,127 @@ export default function SettingsPage({
                 ✓ Saved
               </div>
             )}
+          </div>
+
+          {/* Intro Skip */}
+          <div style={{ marginBottom: 40 }}>
+            <div className="settings-section-title">Anime Intro Skip</div>
+            <div
+              style={{
+                fontSize: 13,
+                color: "var(--text3)",
+                marginBottom: 16,
+                lineHeight: 1.6,
+              }}
+            >
+              Uses{" "}
+              <span style={{ color: "var(--text)", fontWeight: 600 }}>
+                AniSkip
+              </span>{" "}
+              to detect and skip opening/ending segments. Only active for animes
+              and when using{" "}
+              <span style={{ color: "var(--text)", fontWeight: 600 }}>
+                AllManga
+              </span>{" "}
+              as source.
+            </div>
+            <div
+              style={{
+                background: "var(--surface)",
+                border: "1px solid var(--border)",
+                borderRadius: 10,
+                padding: "0 16px",
+              }}
+            >
+              {[
+                {
+                  value: "off",
+                  label: "Off",
+                  desc: "Intro skip is disabled.",
+                },
+                {
+                  value: "auto",
+                  label: "Auto Skip",
+                  desc: "Automatically jumps past the intro/outro when reached.",
+                },
+                {
+                  value: "manual",
+                  label: "Manual Skip",
+                  desc: 'Shows a "Skip Intro" button at the bottom of the player.',
+                },
+              ].map(({ value, label, desc }, i, arr) => (
+                <div
+                  key={value}
+                  onClick={() => {
+                    setIntroSkipMode(value);
+                    storage.set(STORAGE_KEYS.INTRO_SKIP_MODE, value);
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 14,
+                    padding: "16px 0",
+                    borderBottom:
+                      i < arr.length - 1 ? "1px solid var(--border)" : "none",
+                    cursor: "pointer",
+                  }}
+                >
+                  {/* Radio dot */}
+                  <div
+                    style={{
+                      width: 18,
+                      height: 18,
+                      borderRadius: "50%",
+                      border: `2px solid ${introSkipMode === value ? "var(--red)" : "var(--border)"}`,
+                      background:
+                        introSkipMode === value ? "var(--red)" : "transparent",
+                      flexShrink: 0,
+                      marginTop: 1,
+                      boxShadow:
+                        introSkipMode === value
+                          ? "0 0 0 3px rgba(229,9,20,0.18)"
+                          : "none",
+                      transition: "all 0.15s",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    {introSkipMode === value && (
+                      <div
+                        style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: "50%",
+                          background: "#fff",
+                        }}
+                      />
+                    )}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 500,
+                        color: "var(--text)",
+                      }}
+                    >
+                      {label}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: "var(--text3)",
+                        marginTop: 3,
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      {desc}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 

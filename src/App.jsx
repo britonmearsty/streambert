@@ -14,6 +14,7 @@ import { storage, secureStorage, STORAGE_KEYS } from "./utils/storage";
 import { applyAccentColor } from "./utils/appearance";
 import { collectBackupData } from "./utils/backup";
 import { tmdbFetch, setApiErrorHandlers } from "./utils/api";
+import { clearAppCaches } from "./utils/storage";
 
 import Sidebar from "./components/Sidebar";
 import SearchModal from "./components/SearchModal";
@@ -82,6 +83,20 @@ export default function App() {
       }
     });
     return () => window.electron.offScheduledBackupRequested(handler);
+  }, []);
+
+  // ── Post-update cache flush ───────────────────────────────────────────────
+  // On every start, compare the running version against the last-seen version.
+  // If they differ the app was just updated -> clear all caches to prevent problems
+  useEffect(() => {
+    if (!window.electron?.getAppVersion) return;
+    window.electron.getAppVersion().then((version) => {
+      const lastVersion = localStorage.getItem("streambert_lastVersion");
+      if (lastVersion && lastVersion !== version) {
+        clearAppCaches();
+      }
+      localStorage.setItem("streambert_lastVersion", version);
+    });
   }, []);
 
   // ── Startup update check ─────────────────────────────────────────────────
