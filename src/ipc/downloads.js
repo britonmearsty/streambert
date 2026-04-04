@@ -777,9 +777,29 @@ function register(getMainWindow) {
     shell.openExternal(url);
   });
   ipcMain.handle("open-path", (_, filePath) => {
-    shell.openPath(filePath);
+    // If the path points to a file (e.g. an .asar archive or an executable),
+    // open its containing folder instead so the OS file manager actually shows something
+    try {
+      const stat = fs.statSync(filePath);
+      if (stat.isDirectory()) {
+        shell.openPath(filePath);
+      } else {
+        shell.showItemInFolder(filePath);
+      }
+    } catch {
+      // Path doesn't exist or stat failed
+      shell.openPath(filePath);
+    }
   });
   ipcMain.handle("get-install-path", () => {
+    if (process.env.APPIMAGE) {
+      return path.dirname(process.env.APPIMAGE);
+    }
+
+    if (app.isPackaged) {
+      return path.dirname(process.execPath);
+    }
+
     return app.getAppPath();
   });
 
