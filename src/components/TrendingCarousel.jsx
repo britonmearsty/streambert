@@ -42,6 +42,7 @@ const CarouselSlot = memo(function CarouselSlot({
   animating,
   ageRating,
   restricted,
+  isAnime,
 }) {
   if (!item) return null;
   const isCenter = offset === 0;
@@ -122,7 +123,7 @@ const CarouselSlot = memo(function CarouselSlot({
             <RatingBadge cert={ageRating} restricted={restricted} />
           </div>
         )}
-        {isCenter && isAnimeContent(item) && (
+        {isCenter && isAnime && (
           <div className="carousel-anime-badge">ANIME</div>
         )}
       </div>
@@ -412,6 +413,7 @@ export default function TrendingCarousel({
                 animating={animating}
                 ageRating={isCenter ? ratingData.cert : null}
                 restricted={isCenter ? ratingData.restricted : false}
+                isAnime={isCenter ? isAnimeContent(items[idx]) : false}
               />
             );
           })}
