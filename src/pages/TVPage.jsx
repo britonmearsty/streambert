@@ -1104,7 +1104,9 @@ export default function TVPage({
 
       if (introSkipMode === "auto") {
         setSkipPrompt(null);
-        const endTime = skipTimings[activeSegment].endTime;
+        const rawEnd = skipTimings[activeSegment].endTime;
+        const endTime = Number(rawEnd);
+        if (!Number.isFinite(endTime)) return;
         try {
           await wv.executeJavaScript(
             `(() => { const v = document.querySelector('video'); if (v) v.currentTime = ${endTime}; })()`,
@@ -1125,7 +1127,9 @@ export default function TVPage({
   // ── AniSkip: manual skip handler ─────────────────────────────────────────
   const handleManualSkip = useCallback(async () => {
     if (!skipPrompt || !skipTimings?.[skipPrompt]) return;
-    const endTime = skipTimings[skipPrompt].endTime;
+    const rawEnd = skipTimings[skipPrompt].endTime;
+    const endTime = Number(rawEnd);
+    if (!Number.isFinite(endTime)) return;
     const wv = webviewRef.current;
     if (!wv) return;
     try {
