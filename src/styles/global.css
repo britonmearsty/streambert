@@ -433,7 +433,7 @@ body,
 
 /* ── Section ───────────────────────────────────────────────────────────── */
 .section {
-    padding: 32px 48px;
+    padding: 15px 48px;
 }
 
 .section-title {
@@ -441,7 +441,7 @@ body,
     font-size: 28px;
     letter-spacing: 1px;
     color: var(--text);
-    margin-bottom: 20px;
+    margin-bottom: 14px;
     display: flex;
     align-items: center;
     gap: 12px;
@@ -3020,7 +3020,7 @@ kbd {
 }
 
 .carousel-section {
-    padding: 20px 48px 24px;
+    padding: 14px 48px 18px;
 }
 
 .carousel-wrapper {
@@ -3028,7 +3028,7 @@ kbd {
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 310px;
+    height: 312px;
     overflow: hidden;
     user-select: none;
 }

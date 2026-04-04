@@ -50,8 +50,8 @@ const CarouselSlot = memo(function CarouselSlot({
   const year = (item.release_date || item.first_air_date || "").slice(0, 4);
   const poster = imgUrl(item.poster_path, "w342");
 
-  const scale = isCenter ? 1 : abs === 1 ? 0.55 : 0.38;
-  const opacity = isCenter ? 1 : abs === 1 ? 0.55 : 0.28;
+  const scale = isCenter ? 1 : abs === 1 ? 0.75 : 0.54;
+  const opacity = isCenter ? 1 : abs === 1 ? 0.65 : 0.35;
   const tx = offset * 230;
 
   // Stable date comparison — avoids new Date() on every render by caching today
@@ -258,13 +258,17 @@ export default function TrendingCarousel({
 
   const handleWheel = useCallback(
     (e) => {
+      // Only capture the event when the gesture is horizontal.
+      const isHorizontal = Math.abs(e.deltaX) > Math.abs(e.deltaY);
+      if (!isHorizontal) return;
+
       e.preventDefault();
       if (wheelThrottle.current) return;
       wheelThrottle.current = true;
       setTimeout(() => {
         wheelThrottle.current = false;
       }, 600);
-      if (e.deltaY > 0 || e.deltaX > 0) {
+      if (e.deltaX > 0) {
         goNext();
       } else {
         goPrev();
