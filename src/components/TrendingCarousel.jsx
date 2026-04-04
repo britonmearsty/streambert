@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
-import { imgUrl } from "../utils/api";
+import { imgUrl, isAnimeContent } from "../utils/api";
 import { StarIcon, ChevronLeftIcon, ChevronRightIcon } from "./Icons";
 
 const VISIBLE = 5;
@@ -121,6 +121,9 @@ const CarouselSlot = memo(function CarouselSlot({
           <div className="carousel-badge-wrap">
             <RatingBadge cert={ageRating} restricted={restricted} />
           </div>
+        )}
+        {isCenter && isAnimeContent(item) && (
+          <div className="carousel-anime-badge">ANIME</div>
         )}
       </div>
 

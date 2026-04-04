@@ -2531,6 +2531,12 @@ kbd {
     border-color: rgba(255, 215, 0, 0.35);
 }
 
+.card-badge--anime {
+    background: #6d28d9;
+    color: #ddd6fe;
+    border-color: rgba(167, 139, 250, 0.4);
+}
+
 .episode-card--unreleased {
     cursor: default !important;
 }
@@ -3184,6 +3190,23 @@ kbd {
     bottom: 6px;
     left: 6px;
     pointer-events: none;
+}
+
+.carousel-anime-badge {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    pointer-events: none;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    border: 1.5px solid rgba(167, 139, 250, 0.7);
+    background: rgba(109, 40, 217, 0.55);
+    color: #ddd6fe;
+    backdrop-filter: blur(3px);
+    line-height: 1.5;
 }
 
 .carousel-rating-badge {

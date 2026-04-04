@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, memo } from "react";
-import { imgUrl } from "../utils/api";
+import { imgUrl, isAnimeContent } from "../utils/api";
 import {
   PlayIcon,
   FilmIcon,
@@ -22,6 +22,7 @@ const MediaCard = memo(function MediaCard({
   const title = item.title || item.name;
   const year = (item.release_date || item.first_air_date || "").slice(0, 4);
   const isTV = item.media_type === "tv";
+  const isAnime = isAnimeContent(item);
 
   // Unreleased detection
   const rawDate = item.release_date || item.first_air_date;
@@ -146,9 +147,9 @@ const MediaCard = memo(function MediaCard({
           </div>
         </div>
         <span
-          className={`card-badge${isUnreleased ? " card-badge--unreleased" : ""}`}
+          className={`card-badge${isUnreleased ? " card-badge--unreleased" : ""}${isAnime && !isUnreleased ? " card-badge--anime" : ""}`}
         >
-          {isUnreleased ? "SOON" : isTV ? "TV" : "HD"}
+          {isUnreleased ? "SOON" : isAnime ? "ANIME" : isTV ? "TV" : "HD"}
         </span>
       </div>
 
