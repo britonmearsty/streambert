@@ -365,6 +365,7 @@ export default function TVPage({
 }) {
   const [details, setDetails] = useState(null);
   const [seasonData, setSeasonData] = useState(null);
+  const [failedSeasons, setFailedSeasons] = useState(() => new Set()); // season numbers which give 404 on TMDB
   const [selectedSeason, setSelectedSeason] = useState(() =>
     item.season != null ? Number(item.season) : 1,
   );
@@ -545,6 +546,7 @@ export default function TVPage({
     setLoadingSeason(true);
     setSelectedEp(null);
     setPlaying(false);
+    setSeasonData(null); // clear stale episodes immediately
     // AniList virtual seasons on a single-season show: always fetch TMDB S1.
     const tmdbSeasonToFetch =
       isAnime && anilistSeasons?.length > 0 && tmdbSeasons.length <= 1
@@ -555,7 +557,15 @@ export default function TVPage({
       .then((d) => {
         if (mounted) setSeasonData(d);
       })
-      .catch(() => {})
+      .catch(() => {
+        if (mounted) {
+          setSeasonData(null);
+          // Record this season as unavailable (e.g. TMDB has no episode data for it)
+          if (selectedSeason === 0) {
+            setFailedSeasons((prev) => new Set([...prev, selectedSeason]));
+          }
+        }
+      })
       .finally(() => {
         if (mounted) setLoadingSeason(false);
       });
@@ -722,10 +732,19 @@ export default function TVPage({
   const year = (d.first_air_date || "").slice(0, 4);
 
   // ── Season list: prefer episode-group > AniList > TMDB ──────────────────
+  // tmdbSeasons excludes specials (season 0) (only for AniList)
   const tmdbSeasons = useMemo(
     () => (d.seasons || []).filter((s) => s.season_number > 0),
     [d.seasons],
   );
+  // tmdbSeasonsWithSpecials includes season 0 for display purposes.
+  // Excluded for anime: AllManga
+  const tmdbSeasonsWithSpecials = useMemo(() => {
+    if (isAnime) return tmdbSeasons;
+    if (failedSeasons.has(0)) return tmdbSeasons;
+    const specials = (d.seasons || []).filter((s) => s.season_number === 0);
+    return [...tmdbSeasons, ...specials];
+  }, [d.seasons, tmdbSeasons, isAnime, failedSeasons]);
   const useAnilistSeasons = useMemo(
     () =>
       isAnime &&
@@ -754,8 +773,13 @@ export default function TVPage({
         name: s.title || `Season ${s.seasonNum}`,
         episode_count: s.episodes || 0,
       }));
-    return tmdbSeasons;
-  }, [episodeGroupSeasons, useAnilistSeasons, anilistSeasons, tmdbSeasons]);
+    return tmdbSeasonsWithSpecials;
+  }, [
+    episodeGroupSeasons,
+    useAnilistSeasons,
+    anilistSeasons,
+    tmdbSeasonsWithSpecials,
+  ]);
 
   // Episodes for the currently selected season from episode group
   const episodeGroupCurrentEpisodes = useMemo(() => {
@@ -1898,10 +1922,35 @@ export default function TVPage({
                       {sw === "some25" && <PartialCircleIcon pct={25} />}
                       {sw === "some50" && <PartialCircleIcon pct={50} />}
                       {sw === "some75" && <PartialCircleIcon pct={75} />}
-                      Season {s.season_number}
+                      {s.season_number === 0
+                        ? "Specials"
+                        : `Season ${s.season_number}`}
                     </button>
                   );
                 })}
+              </div>
+            )}
+            {selectedSeason === 0 && !loadingSeason && (
+              <div
+                style={{
+                  margin: "8px 0",
+                  padding: "8px 12px",
+                  borderRadius: 8,
+                  background: "rgba(255,200,50,0.08)",
+                  border: "1px solid rgba(255,200,50,0.2)",
+                  fontSize: 12,
+                  color: "var(--text3)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <span>⚠️</span>
+                <span>
+                  Specials support varies by provider. If the wrong episode
+                  plays, try switching to a different source. But it can't be
+                  guaranteed that the correct Episode will be available.
+                </span>
               </div>
             )}
             {loadingSeason && (
