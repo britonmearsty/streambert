@@ -5,10 +5,7 @@ on:
 
 jobs:
   build:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+    runs-on: macos-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -26,43 +23,18 @@ jobs:
             ~/.cache/electron
             ~/.cache/electron-builder
             node_modules
-          key: ${{ runner.os }}-electron-${{ hashFiles('package-lock.json') }}
+          key: macos-electron-${{ hashFiles('package-lock.json') }}
 
       - name: Install deps
         run: npm ci
 
-      - name: Build Linux
-        if: matrix.os == 'ubuntu-latest'
-        run: npm run dist:linux
-
-      - name: Upload Linux artifacts
-        if: matrix.os == 'ubuntu-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-artifacts
-          path: |
-            dist/*.AppImage
-            dist/*.deb
-
-      - name: Build Windows
-        if: matrix.os == 'windows-latest'
-        run: npm run dist:win
-
-      - name: Upload Windows artifacts
-        if: matrix.os == 'windows-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-artifacts
-          path: |
-            dist/*.exe
-            dist/*.zip
+      - name: Build renderer (Vite)
+        run: npx cross-env ELECTRON_DIST=1 vite build
 
       - name: Build macOS
-        if: matrix.os == 'macos-latest'
         run: npm run dist:mac
 
       - name: Upload macOS artifacts
-        if: matrix.os == 'macos-latest'
         uses: actions/upload-artifact@v4
         with:
           name: macos-artifacts
