@@ -1,21 +1,9 @@
-name: Build & Release
-
-on:
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: "Release Tag (e.g 2.3)"
-        required: true
-        type: string
-
 jobs:
   build:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-
     runs-on: ${{ matrix.os }}
-
     permissions:
       contents: write
 
@@ -23,8 +11,7 @@ jobs:
       GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -32,7 +19,7 @@ jobs:
           node-version: 20
           cache: npm
 
-      - name: Cache Electron & deps
+      - name: Cache deps
         uses: actions/cache@v4
         with:
           path: |
@@ -44,10 +31,8 @@ jobs:
       - name: Install deps
         run: npm ci
 
-      - name: Set PUBLISH
-        run: |
-          echo "PUBLISH=onTagOrDraft" >> $GITHUB_ENV
-          echo "RELEASE_VERSION=${{ inputs.tag }}" >> $GITHUB_ENV
+      - name: Set Publishing Mode
+        run: echo "PUBLISH=onTagOrDraft" >> $GITHUB_ENV
 
       - name: Build Linux
         if: matrix.os == 'ubuntu-latest'
