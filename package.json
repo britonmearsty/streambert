@@ -8,7 +8,7 @@
   },
   "license": "GPL-3.0",
   "main": "index.js",
-  "private": false,
+  "private": true,
   "scripts": {
     "dev": "vite build --watch",
     "start": "vite build && electron .",
