@@ -1,12 +1,7 @@
-name: Build & Release
+name: Build & Upload Artifacts
 
 on:
   workflow_dispatch:
-    inputs:
-      tag:
-        description: "Release Tag (e.g 2.3)"
-        required: true
-        type: string
 
 jobs:
   build:
@@ -14,11 +9,6 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-    permissions:
-      contents: write
-
-    env:
-      GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
     steps:
       - uses: actions/checkout@v4
@@ -41,17 +31,41 @@ jobs:
       - name: Install deps
         run: npm ci
 
-      - name: Set Publishing Mode
-        run: echo "PUBLISH=onTagOrDraft" >> $GITHUB_ENV
-
       - name: Build Linux
         if: matrix.os == 'ubuntu-latest'
         run: npm run dist:linux
+
+      - name: Upload Linux artifacts
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-artifacts
+          path: |
+            dist/*.AppImage
+            dist/*.deb
 
       - name: Build Windows
         if: matrix.os == 'windows-latest'
         run: npm run dist:win
 
+      - name: Upload Windows artifacts
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-artifacts
+          path: |
+            dist/*.exe
+            dist/*.zip
+
       - name: Build macOS
         if: matrix.os == 'macos-latest'
         run: npm run dist:mac
+
+      - name: Upload macOS artifacts
+        if: matrix.os == 'macos-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-artifacts
+          path: |
+            dist/*.dmg
+            dist/*.zip
