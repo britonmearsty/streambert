@@ -1,3 +1,13 @@
+name: Build & Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release Tag (e.g 2.3)"
+        required: true
+        type: string
+
 jobs:
   build:
     strategy:
