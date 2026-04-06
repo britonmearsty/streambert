@@ -34,6 +34,7 @@ export default function WindowTitlebar() {
 
   return (
     <div
+      className="window-titlebar"
       style={{
         position: "fixed",
         top: 0,

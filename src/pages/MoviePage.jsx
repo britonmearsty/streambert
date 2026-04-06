@@ -103,6 +103,7 @@ export default function MoviePage({
   const [collection, setCollection] = useState(null); // { name, parts }
   // Webview loading overlay
   const [webviewLoading, setWebviewLoading] = useState(false);
+  const [playerFullscreen, setPlayerFullscreen] = useState(false);
 
   // Derived: detect anime before any effects so effects can use it
   const isAnime = useMemo(
@@ -536,14 +537,18 @@ export default function MoviePage({
     if (!playing) return;
     if (!NEEDS_INTERCEPT.includes(playerSource)) return;
     const enterH = window.electron?.onWebviewEnterFullscreen?.(() => {
-      playerWrapRef.current?.requestFullscreen?.();
+      setPlayerFullscreen(true);
+      document.documentElement.setAttribute("data-player-fullscreen", "1");
     });
     const leaveH = window.electron?.onWebviewLeaveFullscreen?.(() => {
+      setPlayerFullscreen(false);
+      document.documentElement.removeAttribute("data-player-fullscreen");
       if (document.fullscreenElement) document.exitFullscreen?.();
     });
     return () => {
       if (enterH) window.electron?.offWebviewEnterFullscreen?.(enterH);
       if (leaveH) window.electron?.offWebviewLeaveFullscreen?.(leaveH);
+      document.documentElement.removeAttribute("data-player-fullscreen");
     };
   }, [playing, playerSource]);
 
@@ -766,7 +771,10 @@ export default function MoviePage({
 
       {playing && !restricted && !isUnreleased && (
         <div className="section">
-          <div className="player-wrap" ref={playerWrapRef}>
+          <div
+            className={`player-wrap${playerFullscreen ? " player-wrap--fullscreen" : ""}`}
+            ref={playerWrapRef}
+          >
             {/* Universal source-loading overlay, shown instantly on every source/item switch */}
             {webviewLoading && !resolveError && (
               <div

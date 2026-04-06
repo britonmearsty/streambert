@@ -1002,6 +1002,24 @@ body.no-anim *::after {
     border: 1px solid var(--border);
 }
 
+.player-wrap--fullscreen {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 9999;
+    border-radius: 0 !important;
+    border: none !important;
+}
+
+.player-wrap--fullscreen .player-overlay-group,
+.player-wrap--fullscreen .player-overlay-btn {
+    display: none !important;
+}
+
+/* Hide the custom window titlebar on player fullscreen */
+[data-player-fullscreen] .window-titlebar {
+    display: none !important;
+}
+
 .player-wrap::before {
     content: "";
     display: block;

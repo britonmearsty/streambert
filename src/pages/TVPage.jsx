@@ -410,6 +410,7 @@ export default function TVPage({
   const [episodeGroupMap, setEpisodeGroupMap] = useState(null); // Map built from TMDB episode group
   // Webview loading overlay
   const [webviewLoading, setWebviewLoading] = useState(false);
+  const [playerFullscreen, setPlayerFullscreen] = useState(false);
   const [menuPos, setMenuPos] = useState(null);
   // AniSkip
   const [skipTimings, setSkipTimings] = useState(null); // { intro?, outro? }
@@ -1360,14 +1361,20 @@ export default function TVPage({
     if (!playing) return;
     if (!NEEDS_INTERCEPT.includes(playerSource)) return;
     const enterH = window.electron?.onWebviewEnterFullscreen?.(() => {
-      playerWrapRef.current?.requestFullscreen?.();
+      // requestFullscreen() is rejected when Electron is already in fullscreen -> use css overlay
+      setPlayerFullscreen(true);
+      document.documentElement.setAttribute("data-player-fullscreen", "1");
     });
     const leaveH = window.electron?.onWebviewLeaveFullscreen?.(() => {
+      setPlayerFullscreen(false);
+      document.documentElement.removeAttribute("data-player-fullscreen");
       if (document.fullscreenElement) document.exitFullscreen?.();
     });
     return () => {
       if (enterH) window.electron?.offWebviewEnterFullscreen?.(enterH);
       if (leaveH) window.electron?.offWebviewLeaveFullscreen?.(leaveH);
+      // Clean up attribute if component unmounts while fullscreen
+      document.documentElement.removeAttribute("data-player-fullscreen");
     };
   }, [playing, playerSource]);
 
@@ -1532,7 +1539,10 @@ export default function TVPage({
                   </button>
                 )}
               </div>
-              <div className="player-wrap" ref={playerWrapRef}>
+              <div
+                className={`player-wrap${playerFullscreen ? " player-wrap--fullscreen" : ""}`}
+                ref={playerWrapRef}
+              >
                 {/* Universal source-loading overlay, shown instantly on every source/episode switch */}
                 {webviewLoading && !resolveError && (
                   <div
