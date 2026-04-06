@@ -1,7 +1,7 @@
 // ── IPC: AllManga (allmanga.to) episode resolver + local player server ─────────
-// Mirrors ani-cli's approach to resolve direct video URLs from AllAnime.
-// Also hosts a minimal localhost HTTP server so the webview can play mp4/m3u8
-// without triggering a file download.
+// api.allanime.day blocks GET requests with Cloudflare JS challenge.
+// Fix (from ani-cli PR #1632): use POST with JSON body instead of GET.
+// Clock/source endpoints are fetched with plain HTTPS (no CF protection).
 
 const { ipcMain } = require("electron");
 const https = require("https");
@@ -107,55 +107,87 @@ function decodeAllanimeUrl(encoded) {
   return result.replace(/\\u002F/gi, "/").replace(/\\\|/g, "");
 }
 
-// ── Generic HTTPS GET helper ──────────────────────────────────────────────────
+// ── Plain HTTPS GET for clock.json endpoints ──────────────────────────────────
 
-function httpsGet(urlStr, headers = {}) {
+function httpsGet(urlStr) {
   return new Promise((resolve, reject) => {
-    const u = new URL(urlStr);
-    const opts = {
-      hostname: u.hostname,
-      path: u.pathname + u.search,
-      method: "GET",
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0",
-        Referer: "https://allmanga.to",
-        Accept: "*/*",
-        ...headers,
+    function doGet(url) {
+      const u = new URL(url);
+      const req = https.request(
+        {
+          hostname: u.hostname,
+          path: u.pathname + u.search,
+          method: "GET",
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0",
+            Referer: "https://allmanga.to",
+            Origin: "https://allmanga.to",
+            Accept: "*/*",
+          },
+        },
+        (res) => {
+          // Follow redirects
+          if (
+            res.statusCode >= 300 &&
+            res.statusCode < 400 &&
+            res.headers.location
+          ) {
+            const loc = res.headers.location.startsWith("http")
+              ? res.headers.location
+              : new URL(res.headers.location, url).href;
+            res.resume();
+            doGet(loc);
+            return;
+          }
+          let data = "";
+          res.on("data", (c) => (data += c));
+          res.on("end", () => resolve({ status: res.statusCode, body: data }));
+        },
+      );
+      req.on("error", reject);
+      req.setTimeout(12000, () => {
+        req.destroy();
+        reject(new Error("timeout"));
+      });
+      req.end();
+    }
+    doGet(urlStr);
+  });
+}
+
+function allanimeGQL(variables, query) {
+  const body = JSON.stringify({ variables, query });
+  return new Promise((resolve, reject) => {
+    const u = new URL("https://api.allanime.day/api");
+    const req = https.request(
+      {
+        hostname: u.hostname,
+        path: u.pathname,
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Content-Length": Buffer.byteLength(body),
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0",
+          Referer: "https://allmanga.to",
+          Origin: "https://allmanga.to",
+        },
       },
-    };
-    const req = https.request(opts, (res) => {
-      if (
-        res.statusCode >= 300 &&
-        res.statusCode < 400 &&
-        res.headers.location
-      ) {
-        const loc = res.headers.location.startsWith("http")
-          ? res.headers.location
-          : u.origin + res.headers.location;
-        httpsGet(loc, headers).then(resolve).catch(reject);
-        return;
-      }
-      let data = "";
-      res.on("data", (chunk) => (data += chunk));
-      res.on("end", () => resolve({ status: res.statusCode, body: data }));
-    });
+      (res) => {
+        let data = "";
+        res.on("data", (c) => (data += c));
+        res.on("end", () => resolve({ status: res.statusCode, body: data }));
+      },
+    );
     req.on("error", reject);
     req.setTimeout(12000, () => {
       req.destroy();
       reject(new Error("timeout"));
     });
+    req.write(body);
     req.end();
   });
-}
-
-function allanimeGQL(variables, query) {
-  const qs =
-    "variables=" +
-    encodeURIComponent(JSON.stringify(variables)) +
-    "&query=" +
-    encodeURIComponent(query);
-  return httpsGet("https://api.allanime.day/api?" + qs);
 }
 
 function sanitizeTitle(t) {
@@ -257,7 +289,7 @@ function anilistSeasonTitle(baseTitle, seasonNumber) {
   });
 }
 
-// ── Hardcoded show IDs / split seasons ────────────────────────────────────────
+// ── Hardcoded show IDs / split seasons ───────────────────────────────────────
 
 const HARDCODED_SHOW_IDS = {
   "jojo's bizarre adventure": [
@@ -308,16 +340,17 @@ async function resolveEpisodeFromId(showId, epStr, dubSub) {
   }
   if (!sourceUrls) return null;
 
+  return trySourceUrls(sourceUrls);
+}
+
+async function trySourceUrls(sourceUrls) {
   const decodedSources = sourceUrls
     .filter((s) => s.sourceUrl?.startsWith("--"))
-    .map((s) => {
-      let p = decodeAllanimeUrl(s.sourceUrl).replace("/clock", "/clock.json");
-      return {
-        sourceName: s.sourceName || "",
-        priority: s.priority || 0,
-        path: p,
-      };
-    })
+    .map((s) => ({
+      sourceName: s.sourceName || "",
+      priority: s.priority || 0,
+      path: decodeAllanimeUrl(s.sourceUrl).replace("/clock", "/clock.json"),
+    }))
     .sort((a, b) => {
       const ai = PROVIDER_PRIORITY.indexOf(a.sourceName);
       const bi = PROVIDER_PRIORITY.indexOf(b.sourceName);
@@ -328,14 +361,12 @@ async function resolveEpisodeFromId(showId, epStr, dubSub) {
     let fetchUrl = src.path;
     if (fetchUrl.startsWith("//")) fetchUrl = "https:" + fetchUrl;
     else if (fetchUrl.startsWith("/"))
-      fetchUrl = "https://allanime.day" + fetchUrl;
+      fetchUrl = "https://allanime.day" + fetchUrl; // clock paths are on allanime.day
     else if (!fetchUrl.startsWith("http"))
       fetchUrl = "https://allanime.day/" + fetchUrl;
 
     try {
-      const linkRes = await httpsGet(fetchUrl, {
-        Referer: "https://allmanga.to",
-      });
+      const linkRes = await httpsGet(fetchUrl);
       if (linkRes.status !== 200 || !linkRes.body) continue;
       let linkJson;
       try {
@@ -349,13 +380,11 @@ async function resolveEpisodeFromId(showId, epStr, dubSub) {
       const mp4Links = allLinks.filter(
         (l) => !l.link.includes(".m3u8") && !l.link.includes("master."),
       );
-      const candidates2 = mp4Links.length ? mp4Links : allLinks;
-      if (!candidates2.length) continue;
-      candidates2.sort(
+      const best = (mp4Links.length ? mp4Links : allLinks).sort(
         (a, b) =>
           (parseInt(b.resolutionStr) || 0) - (parseInt(a.resolutionStr) || 0),
-      );
-      const best = candidates2[0];
+      )[0];
+      if (!best) continue;
       return {
         ok: true,
         url: best.link,
@@ -371,8 +400,7 @@ async function resolveEpisodeFromId(showId, epStr, dubSub) {
   return null;
 }
 
-// ── Local player server ────────────────────────────────────────────────────────
-// Serves a minimal HTML5 page so the webview plays mp4/m3u8 directly.
+// ── Local player server ───────────────────────────────────────────────────────
 
 let _playerServer = null;
 let _currentVideoUrl = null;
@@ -596,7 +624,11 @@ function register() {
         // 5. Search AllManga
         async function searchAllmanga(query) {
           const vars = {
-            search: { allowAdult: false, allowUnknown: false, query },
+            search: {
+              allowAdult: true,
+              allowUnknown: false,
+              query: query.toLowerCase(),
+            },
             limit: 40,
             page: 1,
             translationType: dubSub,
@@ -651,79 +683,10 @@ function register() {
           return { ok: false, error: "No sourceUrls for ep " + epStr };
 
         // 7. Decode and try each source
-        const decodedSources = sourceUrls
-          .filter((s) => s.sourceUrl?.startsWith("--"))
-          .map((s) => {
-            let p = decodeAllanimeUrl(s.sourceUrl).replace(
-              "/clock",
-              "/clock.json",
-            );
-            return {
-              sourceName: s.sourceName || "",
-              priority: s.priority || 0,
-              path: p,
-            };
-          })
-          .sort((a, b) => {
-            const ai = PROVIDER_PRIORITY.indexOf(a.sourceName);
-            const bi = PROVIDER_PRIORITY.indexOf(b.sourceName);
-            return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
-          });
+        const result = await trySourceUrls(sourceUrls);
+        if (result) return { ...result, searchTitle };
 
-        const debugPaths = [];
-        for (const src of decodedSources) {
-          let fetchUrl = src.path;
-          if (fetchUrl.startsWith("//")) fetchUrl = "https:" + fetchUrl;
-          else if (fetchUrl.startsWith("/"))
-            fetchUrl = "https://allanime.day" + fetchUrl;
-          else if (!fetchUrl.startsWith("http"))
-            fetchUrl = "https://allanime.day/" + fetchUrl;
-
-          debugPaths.push(`[${src.sourceName}] ${fetchUrl}`);
-
-          try {
-            const linkRes = await httpsGet(fetchUrl, {
-              Referer: "https://allmanga.to",
-            });
-            if (linkRes.status !== 200 || !linkRes.body) continue;
-            let linkJson;
-            try {
-              linkJson = JSON.parse(linkRes.body);
-            } catch {
-              continue;
-            }
-            const links = linkJson?.links;
-            if (!links?.length) continue;
-            const allLinks = links.filter((l) => l.link);
-            const mp4Links = allLinks.filter(
-              (l) => !l.link.includes(".m3u8") && !l.link.includes("master."),
-            );
-            const candidates2 = mp4Links.length ? mp4Links : allLinks;
-            if (!candidates2.length) continue;
-            candidates2.sort(
-              (a, b) =>
-                (parseInt(b.resolutionStr) || 0) -
-                (parseInt(a.resolutionStr) || 0),
-            );
-            const best = candidates2[0];
-            return {
-              ok: true,
-              url: best.link,
-              resolution: best.resolutionStr || "?",
-              sourceName: src.sourceName,
-              searchTitle,
-              isDirectMp4: !best.link.includes(".m3u8"),
-              referer: "https://allmanga.to",
-            };
-          } catch {
-            continue;
-          }
-        }
-
-        return {
-          ok: false,
-          error: "No playable link found. Tried: " + debugPaths.join(" | "),
-        };
+        return { ok: false, error: "No playable link found" };
       } catch (e) {
         return { ok: false, error: e.message };
       }
@@ -735,8 +698,8 @@ function register() {
       if (args.path) {
         const url = args.path.startsWith("http")
           ? args.path
-          : "https://allanime.day" + args.path;
-        const r = await httpsGet(url, { Referer: "https://allmanga.to" });
+          : "https://allmanga.to" + args.path;
+        const r = await httpsGet(url);
         return { status: r.status, body: r.body.slice(0, 3000) };
       }
       if (args.showId) {
@@ -754,11 +717,11 @@ function register() {
           parsed._decoded = parsed.data.episode.sourceUrls
             .filter((s) => s.sourceUrl?.startsWith("--"))
             .map((s) => {
-              let p = decodeAllanimeUrl(s.sourceUrl).replace(
+              const p = decodeAllanimeUrl(s.sourceUrl).replace(
                 "/clock",
                 "/clock.json",
               );
-              let fetchUrl = p.startsWith("//")
+              const fetchUrl = p.startsWith("//")
                 ? "https:" + p
                 : p.startsWith("/")
                   ? "https://allanime.day" + p
@@ -774,9 +737,9 @@ function register() {
       const resolvedTitle = await anilistSeasonTitle(args.title || "", season);
       const vars = {
         search: {
-          allowAdult: false,
+          allowAdult: true,
           allowUnknown: false,
-          query: resolvedTitle,
+          query: resolvedTitle.toLowerCase(),
         },
         limit: 10,
         page: 1,
