@@ -1,0 +1,112 @@
+name: Build & Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release Tag (e.g v2.3.0)"
+        required: true
+        type: string
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Node + npm cache
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # Electron cache + node_modules
+      - name: Cache Electron & deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/electron
+            ~/.cache/electron-builder
+            node_modules
+          key: ${{ runner.os }}-electron-${{ hashFiles('package-lock.json') }}
+
+      - name: Install deps
+        run: npm ci
+
+      # Linux
+      - name: Build Linux
+        if: matrix.os == 'ubuntu-latest'
+        run: npm run dist:linux
+
+      # Windows
+      - name: Build Windows
+        if: matrix.os == 'windows-latest'
+        run: npm run dist:win
+
+      # macOS
+      - name: Build macOS
+        if: matrix.os == 'macos-latest'
+        run: npm run dist:mac
+
+      - name: Get or Create Release
+        id: get_release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = core.getInput("tag");
+
+            const releases = await github.rest.repos.listReleases({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+
+            let release = releases.data.find(r => r.tag_name === tag);
+
+            if (!release) {
+              const created = await github.rest.repos.createRelease({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag_name: tag,
+                name: tag,
+                draft: true,
+              });
+              return created.data;
+            }
+
+            return release;
+
+      - name: Delete old assets
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const release = ${{ steps.get_release.outputs.result }};
+            for (const asset of release.assets) {
+              await github.rest.repos.deleteReleaseAsset({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                asset_id: asset.id,
+              });
+            }
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          tag_name: ${{ inputs.tag }}
+          files: |
+            dist/**/*.exe
+            dist/**/*.dmg
+            dist/**/*.AppImage
+            dist/**/*.deb
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
