@@ -544,6 +544,14 @@ export default function TVPage({
 
   useEffect(() => {
     if (!apiKey || !item.id) return;
+    // Episode group data already contains all episodes -> no TMDB season fetch
+    if (episodeGroupData) {
+      setSelectedEp(null);
+      setPlaying(false);
+      setSeasonData(null);
+      setLoadingSeason(false);
+      return;
+    }
     setLoadingSeason(true);
     setSelectedEp(null);
     setPlaying(false);
@@ -1968,30 +1976,31 @@ export default function TVPage({
                 <div className="spinner" />
               </div>
             )}
-            {!loadingSeason && seasonData?.episodes && (
-              <div className="episodes-grid">
-                {currentSeasonEpisodes.map((ep) => {
-                  const pk = `tv_${item.id}_s${selectedSeason}e${ep.episode_number}`;
-                  return (
-                    <EpisodeCard
-                      key={ep.episode_number}
-                      ep={ep}
-                      itemId={item.id}
-                      selectedSeason={selectedSeason}
-                      epPct={progress[pk] || 0}
-                      epWatched={!!watched?.[pk]}
-                      playing={playing}
-                      selectedEpNumber={selectedEp?.episode_number}
-                      downloadsByEpisodeKey={downloadsByEpisodeKey}
-                      restricted={restricted}
-                      onPlay={playEpisode}
-                      onContextMenu={setEpMenu}
-                      onGoToDownloads={onGoToDownloads}
-                    />
-                  );
-                })}
-              </div>
-            )}
+            {!loadingSeason &&
+              (seasonData?.episodes || episodeGroupCurrentEpisodes?.length) && (
+                <div className="episodes-grid">
+                  {currentSeasonEpisodes.map((ep) => {
+                    const pk = `tv_${item.id}_s${selectedSeason}e${ep.episode_number}`;
+                    return (
+                      <EpisodeCard
+                        key={ep.episode_number}
+                        ep={ep}
+                        itemId={item.id}
+                        selectedSeason={selectedSeason}
+                        epPct={progress[pk] || 0}
+                        epWatched={!!watched?.[pk]}
+                        playing={playing}
+                        selectedEpNumber={selectedEp?.episode_number}
+                        downloadsByEpisodeKey={downloadsByEpisodeKey}
+                        restricted={restricted}
+                        onPlay={playEpisode}
+                        onContextMenu={setEpMenu}
+                        onGoToDownloads={onGoToDownloads}
+                      />
+                    );
+                  })}
+                </div>
+              )}
           </div>
         </>
       )}
