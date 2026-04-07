@@ -432,7 +432,7 @@ export default function DownloadModal({
       ? "For MacOS you will have to compile it yourself"
       : "Linux_x64-portable";
   const releaseUrl =
-    "https://github.com/truelockmc/video-downloader/releases/latest";
+    "https://github.com/truelockmc/vid-dl-cli-only/releases/latest";
 
   useEffect(() => {
     if (!downloaderFolder || !isElectron) return;
@@ -1067,7 +1067,7 @@ export default function DownloadModal({
                             window.electron.openExternal(releaseUrl);
                         }}
                       >
-                        github.com/truelockmc/video-downloader
+                        github.com/truelockmc/vid-dl-cli-only/releases/latest
                       </a>{" "}
                       , for your OS: <code>{binaryHint}</code>
                     </li>
