@@ -257,7 +257,12 @@ function createWindow() {
     );
   });
 
-  mainWindow.loadFile(path.join(__dirname, "dist/index.html"));
+  if (process.env.ELECTRON_DEV === "1") {
+    mainWindow.loadURL("http://localhost:5173");
+    mainWindow.webContents.openDevTools();
+  } else {
+    mainWindow.loadFile(path.join(__dirname, "dist/index.html"));
+  }
 
   // Trigger scheduled backup after load
   mainWindow.webContents.once("did-finish-load", () => {

@@ -5,6 +5,10 @@ export default defineConfig(({ mode }) => {
   const isDist = process.env.ELECTRON_DIST === "1";
   return {
     plugins: [react()],
+    server: {
+      host: "0.0.0.0",
+      port: 5173,
+    },
     base: "./",
     build: {
       minify: "terser",

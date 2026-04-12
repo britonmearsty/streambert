@@ -407,3 +407,9 @@ export const fetchEpisodeGroup = async (groupId, apiKey) => {
   flushEgCache();
   return data;
 };
+
+export const fetchProviderContent = async (apiKey, providerId, type, region, params = {}) => {
+  const query = new URLSearchParams({ ...params, watch_region: region }).toString();
+  const path = `/discover/${type}?with_watch_providers=${providerId}&${query}`;
+  return tmdbFetch(path, apiKey);
+};

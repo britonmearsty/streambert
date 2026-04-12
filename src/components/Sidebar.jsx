@@ -109,21 +109,23 @@ export default function Sidebar({
       </div>
 
       {canGoBack && (
-        <SideBtn onClick={onBack} icon={<BackIcon />} label="Back (Ctrl+Z)" />
+        <SideBtn onClick={onBack} icon={<BackIcon />} label="Back (Ctrl+Z)" showLabel />
       )}
 
-      <SideBtn onClick={onSearch} icon={<SearchIcon />} label="Search  (⌘F)" />
+      <SideBtn onClick={onSearch} icon={<SearchIcon />} label="Search  (⌘F)" showLabel />
       <SideBtn
         active={page === "home"}
         onClick={() => onNavigate("home")}
         icon={<HomeIcon />}
         label="Home"
+        showLabel
       />
       <SideBtn
         active={page === "history"}
         onClick={() => onNavigate("history")}
         icon={<HistoryIcon />}
         label="Library & History"
+        showLabel
       />
       <SideBtn
         active={page === "downloads"}
@@ -131,36 +133,42 @@ export default function Sidebar({
         icon={<DownloadsQueueIcon />}
         label="Downloads"
         badge={activeDownloads > 0 ? activeDownloads : null}
+        showLabel
       />
       <SideBtn
         active={page === "movies"}
         onClick={() => onNavigate("movies")}
         icon={<FilmIcon />}
         label="Movies"
+        showLabel
       />
       <SideBtn
         active={page === "tv-shows"}
         onClick={() => onNavigate("tv-shows")}
         icon={<FilmIcon />}
         label="TV Shows"
+        showLabel
       />
       <SideBtn
         active={page === "sports"}
         onClick={() => onNavigate("sports")}
         icon={<FilmIcon />}
         label="Sports"
+        showLabel
       />
       <SideBtn
         active={page === "iptv"}
         onClick={() => onNavigate("iptv")}
         icon={<FilmIcon />}
         label="Live TV"
+        showLabel
       />
       <SideBtn
         active={page === "collections"}
         onClick={() => onNavigate("collections")}
         icon={<FilmIcon />}
         label="Collections"
+        showLabel
       />
 
       <div className="sidebar-sep" />
@@ -187,13 +195,16 @@ export default function Sidebar({
               onMouseLeave={handleMouseLeave}
               style={{ cursor: "grab", position: "relative" }}
             >
-              {item.poster_path ? (
-                <img src={imgUrl(item.poster_path, "w200")} alt={title} />
-              ) : (
-                <div className="no-img">
-                  <FilmIcon />
-                </div>
-              )}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, width: "100%" }}>
+                {item.poster_path ? (
+                  <img src={imgUrl(item.poster_path, "w200")} alt={title} />
+                ) : (
+                  <div className="no-img" style={{ width: 40, height: "100%", flexShrink: 0 }}>
+                    <FilmIcon />
+                  </div>
+                )}
+                <span className="saved-thumb-title">{title}</span>
+              </div>
               {dragOver === index && (
                 <div
                   style={{
@@ -247,12 +258,14 @@ export default function Sidebar({
           onClick={onShowShortcuts}
           icon={<HelpIcon />}
           label="Help & Shortcuts (?)"
+          showLabel
         />
         <SideBtn
           active={page === "settings"}
           onClick={() => onNavigate("settings")}
           icon={<SettingsIcon />}
           label="Settings"
+          showLabel
         />
         <button
           className="sidebar-btn"
@@ -268,7 +281,7 @@ export default function Sidebar({
   );
 }
 
-function SideBtn({ active, onClick, icon, label, badge }) {
+function SideBtn({ active, onClick, icon, label, badge, showLabel = false }) {
   return (
     <button
       className={`sidebar-btn ${active ? "active" : ""}`}
@@ -276,6 +289,7 @@ function SideBtn({ active, onClick, icon, label, badge }) {
       style={{ position: "relative" }}
     >
       {icon}
+      {showLabel && <span className="sidebar-label">{label}</span>}
       <span className="tooltip">{label}</span>
       {badge && (
         <span

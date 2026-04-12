@@ -60,7 +60,7 @@
     --text: #f0f0f0;
     --text2: #c0c0c0;
     --text3: #909090;
-    --sidebar: 72px;
+    --sidebar: 220px;
     --radius: 8px;
     --font-display: "Bebas Neue", sans-serif;
     --font-body: "DM Sans", sans-serif;
@@ -142,12 +142,14 @@ body,
 }
 
 .sidebar-btn {
-    width: 44px;
+    width: 100%;
     height: 44px;
     border-radius: var(--radius);
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
+    gap: 12px;
+    padding: 0 16px;
     border: none;
     background: transparent;
     color: var(--text3);
@@ -160,6 +162,7 @@ body,
 .sidebar-btn svg {
     width: 20px;
     height: 20px;
+    flex-shrink: 0;
 }
 
 .sidebar-btn:hover,
@@ -188,6 +191,13 @@ body,
     z-index: 200;
 }
 
+.sidebar-btn .sidebar-label {
+    font-size: 11px;
+    color: var(--text);
+    white-space: nowrap;
+    text-align: center;
+}
+
 .sidebar-btn:hover .tooltip {
     opacity: 1;
 }
@@ -199,15 +209,14 @@ body,
     width: 100%;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 0;
+    gap: 8px;
+    padding: 8px 12px;
     min-height: 0;
 }
 
 .saved-thumb {
-    width: 44px;
-    height: 64px;
+    width: 100%;
+    height: 60px;
     border-radius: 5px;
     overflow: visible;
     cursor: pointer;
@@ -215,14 +224,29 @@ body,
     flex-shrink: 0;
     position: relative;
     border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px;
+    background: var(--surface2);
 }
 
 .saved-thumb img {
-    border-radius: 5px;
+    border-radius: 4px;
     overflow: hidden;
-    width: 100%;
+    width: 40px;
     height: 100%;
     object-fit: cover;
+    flex-shrink: 0;
+}
+
+.saved-thumb .saved-thumb-title {
+    font-size: 12px;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
 }
 
 .saved-thumb > .no-img {
@@ -234,13 +258,12 @@ body,
 
 .saved-thumb:hover {
     border-color: var(--red);
-    transform: scale(1.05);
-    box-shadow: var(--red-glow);
+    background: var(--red-dim);
 }
 
 .saved-thumb-tooltip {
     position: fixed;
-    left: 70px;
+    left: 200px;
     transform: translateY(-50%);
     background: var(--surface3);
     color: var(--text);
