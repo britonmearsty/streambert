@@ -43,6 +43,7 @@ import {
   RatingLockIcon,
   SourceIcon,
   ShieldBlockIcon,
+  ChevronDownIcon,
 } from "../components/Icons";
 import DownloadModal from "../components/DownloadModal";
 import TrailerModal from "../components/TrailerModal";
@@ -459,6 +460,8 @@ export default function TVPage({
   const ratingCountry = useMemo(() => getRatingCountry(storage), []);
   const restricted = isRestricted(rating.minAge, ageLimitSetting);
   const [seasonMenu, setSeasonMenu] = useState(null); // { x, y, seasonNum }
+  const [showSeasonDropdown, setShowSeasonDropdown] = useState(false);
+  const seasonSelectorRef = useRef(null);
 
   // Read threshold from settings (default 20s), stable across renders
   const [watchedThreshold] = useState(
@@ -699,7 +702,7 @@ export default function TVPage({
       .then((res) => {
         if (!mounted) return;
         if (res?.ok && res.url) {
-          if (res.isDirectMp4 !== undefined) {
+          if (res.isDirectMp4) {
             window.electron
               .setPlayerVideo({
                 url: res.url,
@@ -708,8 +711,7 @@ export default function TVPage({
               })
               .then((r) => {
                 if (!mounted) return;
-                setResolvedPlayerUrl(r.playerUrl);
-                // Also expose raw url so download button can use it
+                setResolvedPlayerUrl(r.playerUrl.replace("/player", "/proxy") + "?url=" + encodeURIComponent(res.url));
                 setM3u8Url(res.url);
               })
               .catch(() => {
@@ -741,15 +743,21 @@ export default function TVPage({
     return () => window.electron.offM3u8Found(handler);
   }, []);
 
-  // Close source dropdown on scroll or click-outside
+  // Close dropdowns on scroll or click-outside
   useEffect(() => {
-    if (!showSourceMenu) return;
-    const close = () => setShowSourceMenu(false);
+    if (!showSourceMenu && !showSeasonDropdown) return;
+    const close = (e) => {
+      if (e?.target?.closest?.(".dropdown-menu") || e?.target?.closest?.(".source-dropdown")) return;
+      setShowSourceMenu(false);
+      setShowSeasonDropdown(false);
+    };
     window.addEventListener("scroll", close, { capture: true, passive: true });
     const handleClick = (e) => {
       if (
         sourceRef.current?.contains(e.target) ||
-        e.target.closest(".source-dropdown")
+        e.target.closest(".source-dropdown") ||
+        seasonSelectorRef.current?.contains(e.target) ||
+        e.target.closest(".dropdown-menu")
       )
         return;
       close();
@@ -759,7 +767,7 @@ export default function TVPage({
       window.removeEventListener("scroll", close, { capture: true });
       document.removeEventListener("mousedown", handleClick);
     };
-  }, [showSourceMenu]);
+  }, [showSourceMenu, showSeasonDropdown]);
 
   useEffect(() => {
     if (!window.electron) return;
@@ -1028,6 +1036,37 @@ export default function TVPage({
     [seasons, selectedSeason, currentSeasonEpisodes, item.id, onMarkUnwatched],
   );
 
+  const nextToWatch = useCallback(() => {
+    if (item.season && item.episode) {
+      return { season: Number(item.season), episode: Number(item.episode) };
+    }
+    for (const s of seasons) {
+      const sNum = s.season_number;
+      if (sNum === 0) continue;
+      const count = s.episode_count || 0;
+      for (let i = 1; i <= count; i++) {
+        if (!watched?.[`tv_${item.id}_s${sNum}e${i}`]) {
+          return { season: sNum, episode: i };
+        }
+      }
+    }
+    return { season: seasons.find(s => s.season_number > 0)?.season_number || 1, episode: 1 };
+  }, [seasons, watched, item.id, item.season, item.episode]);
+
+  const hasHistory = useMemo(() => {
+     return Object.keys(progress || {}).some(k => k.startsWith(`tv_${item.id}_`));
+  }, [progress, item.id]);
+
+  useEffect(() => {
+    if (window._autoPlayEp && !loadingSeason && currentSeasonEpisodes.length > 0) {
+      const ep = currentSeasonEpisodes.find(e => e.episode_number === window._autoPlayEp);
+      if (ep) {
+        window._autoPlayEp = null;
+        playEpisode(ep);
+      }
+    }
+  }, [loadingSeason, currentSeasonEpisodes]);
+
   const currentProgressKey = selectedEp
     ? `tv_${item.id}_s${selectedSeason}e${selectedEp.episode_number}`
     : null;
@@ -1228,9 +1267,11 @@ export default function TVPage({
   // ── Auto-track progress + auto-watched every 5s ──────────────────────────
   useEffect(() => {
     if (!playing || !currentProgressKey) return;
+    let active = true;
     let interval = null;
     const timer = setTimeout(() => {
       interval = setInterval(async () => {
+        if (!active) return;
         try {
           const wv = webviewRef.current;
           if (!wv) return;
@@ -1282,6 +1323,7 @@ export default function TVPage({
                 const seekTo = lastKnownTimeRef.current;
                 seekBackCooldownRef.current = now + 8000;
                 try {
+                  if (!active) return;
                   await wv.executeJavaScript(`
                     (() => {
                       const v = document.querySelector('video')
@@ -1320,6 +1362,7 @@ export default function TVPage({
       }, 5000);
     }, 3000);
     return () => {
+      active = false;
       clearTimeout(timer);
       clearInterval(interval);
     };
@@ -1388,6 +1431,7 @@ export default function TVPage({
           source: playerSource,
           progressKey: episodeProgressKey,
           dubMode,
+          anilistId: anilistData?.id,
         });
       } else {
         setM3u8Url(null);
@@ -1537,6 +1581,32 @@ export default function TVPage({
                 )}
                 <p className="detail-overview">{displayOverview}</p>
                 <div className="detail-actions">
+                  {!restricted && (
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => {
+                        const next = nextToWatch();
+                        if (next) {
+                           // Navigate to season/ep and play
+                           setSelectedSeason(next.season);
+                           // Because setSelectedSeason is async, we might need to wait or rely on side effects
+                           // Usually, setting season will result in fetch. 
+                           // For now, if it's already the current season, we can play immediately.
+                           if (selectedSeason === next.season && currentSeasonEpisodes.length > 0) {
+                             const ep = currentSeasonEpisodes.find(e => e.episode_number === next.episode);
+                             if (ep) playEpisode(ep);
+                           } else {
+                             // This is a bit tricky without a proper 'onSeasonLoad' callback.
+                             // But we can set a flag.
+                             window._autoPlayEp = next.episode;
+                             setSelectedSeason(next.season);
+                           }
+                        }
+                      }}
+                    >
+                      <PlayIcon /> {hasHistory ? "Continue" : "Play"}
+                    </button>
+                  )}
                   {trailerKey &&
                     (restricted ? (
                       <button
@@ -1558,8 +1628,19 @@ export default function TVPage({
                     {isSaved ? <BookmarkFillIcon /> : <BookmarkIcon />}
                     {isSaved ? "Saved" : "Save"}
                   </button>
-                  <button className="btn btn-ghost" onClick={onBack}>
-                    <BackIcon /> Back
+                  <button 
+                    className="btn btn-secondary" 
+                    onClick={() => {
+                      const watchedAll = seasons.every(s => seasonWatchedMap[s.season_number] === "all");
+                      if (watchedAll) {
+                        seasons.forEach(s => markSeasonUnwatched(s.season_number));
+                      } else {
+                        seasons.forEach(s => markSeasonWatched(s.season_number));
+                      }
+                    }}
+                  >
+                    <WatchedIcon size={18} watched={seasons.every(s => seasonWatchedMap[s.season_number] === "all")} />
+                    {seasons.every(s => seasonWatchedMap[s.season_number] === "all") ? "Unwatch All" : "Mark Watched"}
                   </button>
                 </div>
               </div>
@@ -1657,6 +1738,7 @@ export default function TVPage({
                   </div>
                 )}
                 <webview
+                  key={playerSource}
                   ref={webviewRef}
                   src={
                     isAsync
@@ -1667,6 +1749,7 @@ export default function TVPage({
                           item.id,
                           playerEp.season,
                           playerEp.episode,
+                          anilistData?.id
                         )
                   }
                   partition="persist:player"
@@ -1688,6 +1771,7 @@ export default function TVPage({
                   }}
                   tabIndex={-1}
                 />
+                <div className="player-drag-handle" />
                 {/* Left-side overlay button group, flex row, no fixed px offsets */}
                 <div className="player-overlay-group">
                   <button
@@ -1968,37 +2052,81 @@ export default function TVPage({
           <div className="section">
             <div className="section-title">Episodes</div>
             {seasons.length > 0 && (
-              <div className="season-selector">
-                {seasons.map((s) => {
-                  const sw = seasonWatchedMap[s.season_number] ?? "none";
-                  return (
-                    <button
-                      key={s.season_number}
-                      className={`season-btn ${selectedSeason === s.season_number ? "active" : ""} ${sw === "all" ? "season-watched" : sw.startsWith("some") ? "season-partial" : ""}`}
-                      onClick={() => setSelectedSeason(s.season_number)}
-                      onContextMenu={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setSeasonMenu({
-                          x: e.clientX,
-                          y: e.clientY,
-                          seasonNum: s.season_number,
-                        });
-                      }}
-                      title="Right-click to mark season as watched/unwatched"
-                    >
-                      {sw === "all" && (
-                        <span className="season-watched-icon">✓</span>
+              <div className="season-selector-v2" ref={seasonSelectorRef}>
+                <div className="dropdown-container">
+                  <div
+                    className={`dropdown-trigger ${showSeasonDropdown ? "dropdown-trigger--active" : ""}`}
+                    onClick={() => setShowSeasonDropdown(!showSeasonDropdown)}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <TVIcon />
+                      <span style={{ fontWeight: 600, whiteSpace: "nowrap" }}>
+                        {selectedSeason === 0
+                          ? "Specials"
+                          : `Season ${selectedSeason}`}
+                      </span>
+                      {seasonWatchedMap[selectedSeason] === "all" && (
+                        <div className="watched-badge-mini" title="Season Complete">
+                          <WatchedIcon size={12} />
+                        </div>
                       )}
-                      {sw === "some25" && <PartialCircleIcon pct={25} />}
-                      {sw === "some50" && <PartialCircleIcon pct={50} />}
-                      {sw === "some75" && <PartialCircleIcon pct={75} />}
-                      {s.season_number === 0
-                        ? "Specials"
-                        : `Season ${s.season_number}`}
-                    </button>
-                  );
-                })}
+                    </div>
+                    <ChevronDownIcon size={18} />
+                  </div>
+
+                  {showSeasonDropdown && (
+                    <div className="dropdown-menu">
+                      {seasons.map((s) => {
+                        const sw = seasonWatchedMap[s.season_number] ?? "none";
+                        const isSelected = selectedSeason === s.season_number;
+                        return (
+                          <div
+                            key={s.season_number}
+                            className={`dropdown-item ${isSelected ? "dropdown-item--active" : ""} ${sw === "all" ? "item-watched" : ""}`}
+                            onClick={() => {
+                              setSelectedSeason(s.season_number);
+                              setShowSeasonDropdown(false);
+                            }}
+                            onContextMenu={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setSeasonMenu({
+                                x: e.clientX,
+                                y: e.clientY,
+                                seasonNum: s.season_number,
+                              });
+                            }}
+                          >
+                            <div className="dropdown-item-content">
+                              <span className="dropdown-item-label" style={{ whiteSpace: "nowrap" }}>
+                                {s.season_number === 0
+                                  ? "Specials"
+                                  : `Season ${s.season_number}`}
+                              </span>
+                              <div className="dropdown-item-meta">
+                                {sw === "all" && (
+                                  <WatchedIcon size={14} />
+                                )}
+                                {sw === "some25" && (
+                                  <PartialCircleIcon pct={25} />
+                                )}
+                                {sw === "some50" && (
+                                  <PartialCircleIcon pct={50} />
+                                )}
+                                {sw === "some75" && (
+                                  <PartialCircleIcon pct={75} />
+                                )}
+                                <span className="ep-count">
+                                  {s.episode_count} Episodes
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
             {selectedSeason === 0 && !loadingSeason && (

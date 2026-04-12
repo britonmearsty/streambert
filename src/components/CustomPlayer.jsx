@@ -1,4 +1,4 @@
-import { forwardRef, isValidElement, useEffect } from "react";
+import { forwardRef, isValidElement, useEffect, useRef, useCallback } from "react";
 import {
   createPlayer,
   Poster,
@@ -36,14 +36,28 @@ export default function CustomPlayer({
   accentColor,
   onTimeUpdate,
   onEnded,
+  audioBoost = false,
 }) {
   const accent = accentColor ? `#${accentColor.replace(/^#/, "")}` : "var(--red)";
+  const containerRef = useRef(null);
+
+  const handlePlayerClick = useCallback(() => {
+    const video = containerRef.current?.querySelector("video");
+    if (!video) return;
+    if (video.paused) {
+      video.play().catch(() => {});
+    } else {
+      video.pause();
+    }
+  }, []);
 
   return (
     <Player.Provider>
       <Container
+        ref={containerRef}
         className="media-minimal-skin media-minimal-skin--video"
         style={{ "--media-accent": accent, position: "absolute", inset: 0, borderRadius: 0 }}
+        onClick={handlePlayerClick}
       >
         <VideoWithSubs
           src={src}
@@ -51,6 +65,7 @@ export default function CustomPlayer({
           startAt={startAt}
           onTimeUpdate={onTimeUpdate}
           onEnded={onEnded}
+          audioBoost={audioBoost}
         />
 
         <BufferingIndicator
@@ -140,13 +155,12 @@ export default function CustomPlayer({
                   <TimeSlider.Buffer className="media-slider__buffer" />
                 </TimeSlider.Track>
                 <TimeSlider.Thumb className="media-slider__thumb" style={{ background: accent }} />
-                <div className="media-preview media-slider__preview">
-                  <div className="media-preview__thumbnail-wrapper">
-                    <Slider.Thumbnail className="media-preview__thumbnail" />
+                  <div className="media-preview media-slider__preview">
+                    <div className="media-preview__thumbnail-wrapper">
+                      <Slider.Thumbnail className="media-preview__thumbnail" />
+                    </div>
+                    <TimeSlider.Value type="pointer" className="media-time media-preview__time" />
                   </div>
-                  <TimeSlider.Value type="pointer" className="media-time media-preview__time" />
-                  <span className="media-preview__dot" />
-                </div>
               </TimeSlider.Root>
             </div>
 
@@ -210,7 +224,7 @@ export default function CustomPlayer({
 }
 
 // ── VideoWithSubs: renders the video + subtitle tracks + event callbacks ──────
-function VideoWithSubs({ src, subtitles, startAt, onTimeUpdate, onEnded }) {
+function VideoWithSubs({ src, subtitles, startAt, onTimeUpdate, onEnded, audioBoost }) {
   const player = usePlayer((s) => s);
 
   useEffect(() => {
@@ -234,14 +248,36 @@ function VideoWithSubs({ src, subtitles, startAt, onTimeUpdate, onEnded }) {
     };
   }, [player?.el, startAt]);
 
+  useEffect(() => {
+    if (!player?.el) return;
+    const video = player.el.querySelector("video");
+    if (!video) return;
+
+    if (audioBoost && !video._boosted) {
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const ctx = new AudioContext();
+        const source = ctx.createMediaElementSource(video);
+        const gainNode = ctx.createGain();
+        gainNode.gain.value = 2.5;
+        source.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        video._boosted = true;
+        video._gainNode = gainNode;
+      } catch (e) {}
+    } else if (!audioBoost && video._gainNode) {
+      video._gainNode.gain.value = 1.0;
+    }
+  }, [player?.el, audioBoost]);
+
   return (
-    <>
+    <div style={{ width: "100%", height: "100%" }} onClick={handleVideoClick} onDoubleClick={handleVideoDoubleClick}>
       <Video src={src} playsInline autoPlay>
         {subtitles.map((s) => (
           <track key={s.lang} kind="subtitles" label={s.lang} srcLang={s.lang} src={s.url} />
         ))}
       </Video>
-    </>
+    </div>
   );
 }
 

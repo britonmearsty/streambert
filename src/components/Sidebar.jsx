@@ -14,6 +14,13 @@ import {
   Trophy,
   Radio,
   FolderArchive,
+  CalendarDays,
+  Home,
+  Clapperboard,
+  MonitorPlay,
+  Sparkles,
+  Library,
+  History,
 } from "lucide-react";
 
 export default function Sidebar({
@@ -33,7 +40,6 @@ export default function Sidebar({
   const dragItem = useRef(null);
   const dragNode = useRef(null);
 
-  const [tooltip, setTooltip] = useState(null); // { title, y }
   const [contextMenu, setContextMenu] = useState(null); // { item, x, y }
 
   useEffect(() => {
@@ -49,7 +55,6 @@ export default function Sidebar({
   const handleContextMenu = (e, item) => {
     e.preventDefault();
     e.stopPropagation();
-    setTooltip(null);
     setContextMenu({ item, x: e.clientX, y: e.clientY });
   };
 
@@ -93,14 +98,6 @@ export default function Sidebar({
     e.dataTransfer.dropEffect = "move";
   };
 
-  const handleMouseEnter = (e, title) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    setTooltip({ title, y: rect.top + rect.height / 2 });
-  };
-
-  const handleMouseLeave = () => {
-    setTooltip(null);
-  };
 
   return (
     <div className="sidebar">
@@ -129,38 +126,18 @@ export default function Sidebar({
           <Search size={16} />
         </button>
       </div>
-      
       <div className="sidebar-group">
         <SideBtn
           active={page === "home"}
           onClick={() => onNavigate("home")}
-          icon={<LayoutGrid size={20} />}
+          icon={<Home size={20} />}
           label="Home"
           showLabel
         />
         <SideBtn
-          active={page === "history"}
-          onClick={() => onNavigate("history")}
-          icon={<Bookmark size={20} />}
-          label="History"
-          showLabel
-        />
-        <SideBtn
-          active={page === "downloads"}
-          onClick={() => onNavigate("downloads")}
-          icon={<Download size={20} />}
-          label="Downloads"
-          badge={activeDownloads > 0 ? activeDownloads : null}
-          showLabel
-        />
-      </div>
-      
-      <div className="sidebar-group">
-        <div className="sidebar-group-title">Browse</div>
-        <SideBtn
           active={page === "movies"}
           onClick={() => onNavigate("movies")}
-          icon={<Film size={20} />}
+          icon={<Clapperboard size={20} />}
           label="Movies"
           showLabel
         />
@@ -174,8 +151,15 @@ export default function Sidebar({
         <SideBtn
           active={page === "anime"}
           onClick={() => onNavigate("anime")}
-          icon={<Tv size={20} />}
+          icon={<Sparkles size={20} />}
           label="Anime"
+          showLabel
+        />
+        <SideBtn
+          active={page === "coming-soon"}
+          onClick={() => onNavigate("coming-soon")}
+          icon={<CalendarDays size={20} />}
+          label="Coming Soon"
           showLabel
         />
         <SideBtn
@@ -195,8 +179,23 @@ export default function Sidebar({
         <SideBtn
           active={page === "collections"}
           onClick={() => onNavigate("collections")}
-          icon={<FolderArchive size={20} />}
+          icon={<Library size={20} />}
           label="Collections"
+          showLabel
+        />
+        <SideBtn
+          active={page === "history"}
+          onClick={() => onNavigate("history")}
+          icon={<History size={20} />}
+          label="History"
+          showLabel
+        />
+        <SideBtn
+          active={page === "downloads"}
+          onClick={() => onNavigate("downloads")}
+          icon={<Download size={20} />}
+          label="Downloads"
+          badge={activeDownloads > 0 ? activeDownloads : null}
           showLabel
         />
       </div>
@@ -221,8 +220,6 @@ export default function Sidebar({
                   onNavigate(item.media_type === "tv" ? "tv" : "movie", item)
                 }
                 onContextMenu={(e) => handleContextMenu(e, item)}
-                onMouseEnter={(e) => handleMouseEnter(e, title)}
-                onMouseLeave={handleMouseLeave}
                 style={{ cursor: "grab", position: "relative" }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 10, width: "100%" }}>
@@ -255,11 +252,6 @@ export default function Sidebar({
         </div>
       </div>
 
-      {tooltip && (
-        <div className="saved-thumb-tooltip" style={{ top: tooltip.y }}>
-          {tooltip.title}
-        </div>
-      )}
 
       {contextMenu && (
         <div

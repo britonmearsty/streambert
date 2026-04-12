@@ -95,9 +95,52 @@ export const PLAYER_SOURCES = [
     tag: null,
     note: null,
     supportsProgress: true,
-    movieUrl: (id) => `https://player.videasy.net/movie/${id}`,
+    movieUrl: (id, params = {}) => {
+      const q = new URLSearchParams({
+        color: "8B5CF6",
+        overlay: "true",
+        autoplay: "true",
+        ...params,
+      }).toString();
+      return `https://player.videasy.net/movie/${id}?${q}`;
+    },
+    tvUrl: (id, season, ep, params = {}) => {
+      const q = new URLSearchParams({
+        color: "8B5CF6",
+        nextEpisode: "true",
+        autoplayNextEpisode: "true",
+        episodeSelector: "true",
+        overlay: "true",
+        autoplay: "true",
+        ...params,
+      }).toString();
+      return `https://player.videasy.net/tv/${id}/${season}/${ep}?${q}`;
+    },
+    animeUrl: (id, ep, params = {}) => {
+      const q = new URLSearchParams({
+        color: "8B5CF6",
+        nextEpisode: "true",
+        autoplayNextEpisode: "true",
+        episodeSelector: "true",
+        overlay: "true",
+        autoplay: "true",
+        ...params,
+      }).toString();
+      const baseUrl = ep
+        ? `https://player.videasy.net/anime/${id}/${ep}`
+        : `https://player.videasy.net/anime/${id}`;
+      return `${baseUrl}?${q}`;
+    },
+  },
+  {
+    id: "vidfast",
+    label: "VidFast",
+    tag: null,
+    note: null,
+    supportsProgress: true,
+    movieUrl: (id) => `https://vidfast.pro/movie/${id}?autoPlay=true&title=true&poster=true`,
     tvUrl: (id, season, ep) =>
-      `https://player.videasy.net/tv/${id}/${season}/${ep}`,
+      `https://vidfast.pro/tv/${id}/${season}/${ep}?autoPlay=true&nextButton=true&autoNext=true&title=true&poster=true`,
   },
   {
     id: "vidsrc",
@@ -133,9 +176,12 @@ export const PLAYER_SOURCES = [
   },
 ];
 
-export const getSourceUrl = (sourceId, type, id, season, ep) => {
+export const getSourceUrl = (sourceId, type, id, season, ep, animeId = null) => {
   const src =
     PLAYER_SOURCES.find((s) => s.id === sourceId) ?? PLAYER_SOURCES[0];
+  if (sourceId === "videasy" && (type === "anime" || animeId)) {
+    return src.animeUrl(animeId || id, type === "movie" ? null : ep);
+  }
   return type === "movie" ? src.movieUrl(id) : src.tvUrl(id, season, ep);
 };
 
@@ -361,7 +407,7 @@ export const isAnimeContent = (item, details) => {
 
 // Default sources
 export const ANIME_DEFAULT_SOURCE = "allmanga";
-export const NON_ANIME_DEFAULT_SOURCE = "vidsrc";
+export const NON_ANIME_DEFAULT_SOURCE = "videasy";
 
 // ── Episode Group fetch (localStorage + in-memory cache, 7-day TTL) ─────────
 // Episode groups almost never change, so we cache aggressively across sessions.

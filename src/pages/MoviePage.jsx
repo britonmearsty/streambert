@@ -104,6 +104,23 @@ export default function MoviePage({
   const [collection, setCollection] = useState(null); // { name, parts }
   const [cast, setCast] = useState([]);
   const [similar, setSimilar] = useState([]);
+  const [scrollState, setScrollState] = useState({ cast: "both", similar: "both" });
+  const castRef = useRef(null);
+  const similarRef = useRef(null);
+
+  const checkScroll = (ref, key) => {
+    if (!ref.current) return;
+    const { scrollLeft, scrollWidth, clientWidth } = ref.current;
+    const atStart = scrollLeft <= 10;
+    const atEnd = scrollLeft + clientWidth >= scrollWidth - 10;
+    setScrollState((prev) => ({ ...prev, [key]: atStart && atEnd ? "both" : atEnd ? "start" : atStart ? "end" : "both" }));
+  };
+
+  const scrollBy = (ref, dir, key) => {
+    if (!ref.current) return;
+    ref.current.scrollBy({ left: dir * 220, behavior: "smooth" });
+    setTimeout(() => checkScroll(ref, key), 300);
+  };
   // Webview loading overlay
   const [webviewLoading, setWebviewLoading] = useState(false);
   const [playerFullscreen, setPlayerFullscreen] = useState(false);
@@ -339,7 +356,7 @@ export default function MoviePage({
       .then((res) => {
         if (!mounted) return;
         if (res?.ok && res.url) {
-          if (res.isDirectMp4 !== undefined) {
+          if (res.isDirectMp4) {
             window.electron
               .setPlayerVideo({
                 url: res.url,
@@ -348,7 +365,7 @@ export default function MoviePage({
               })
               .then((r) => {
                 if (!mounted) return;
-                setResolvedPlayerUrl(r.playerUrl);
+                setResolvedPlayerUrl(r.playerUrl.replace("/player", "/proxy") + "?url=" + encodeURIComponent(res.url));
                 setM3u8Url(res.url);
               })
               .catch(() => {
@@ -463,9 +480,11 @@ export default function MoviePage({
   // ── Auto-track progress + auto-watched every 5s ──────────────────────────
   useEffect(() => {
     if (!playing || !sourceSupportsProgress(playerSource)) return;
+    let active = true;
     let interval = null;
     const timer = setTimeout(() => {
       interval = setInterval(async () => {
+        if (!active) return;
         try {
           const wv = webviewRef.current;
           if (!wv) return;
@@ -515,6 +534,7 @@ export default function MoviePage({
                 const seekTo = lastKnownTimeRef.current;
                 seekBackCooldownRef.current = now + 8000;
                 try {
+                  if (!active) return;
                   await wv.executeJavaScript(`
                     (() => {
                       const v = document.querySelector('video')
@@ -553,6 +573,7 @@ export default function MoviePage({
       }, 5000);
     }, 3000);
     return () => {
+      active = false;
       clearTimeout(timer);
       clearInterval(interval);
     };
@@ -568,6 +589,7 @@ export default function MoviePage({
         source: playerSource,
         progressKey,
         dubMode,
+        anilistId: anilistData?.id,
       });
     } else {
       setM3u8Url(null);
@@ -754,7 +776,7 @@ export default function MoviePage({
                 </button>
               ) : (
                 <button className="btn btn-primary" onClick={handlePlay}>
-                  <PlayIcon /> {playing ? "Restart" : "Play"}
+                  <PlayIcon /> {pct > 0 && !isWatched ? "Continue" : (isWatched ? "Rewatch" : "Play")}
                 </button>
               )}
               {trailerKey &&
@@ -778,39 +800,21 @@ export default function MoviePage({
                 {isSaved ? <BookmarkFillIcon /> : <BookmarkIcon />}
                 {isSaved ? "Saved" : "Save"}
               </button>
-              {!isUnreleased &&
-                (isWatched ? (
-                  <button
-                    className="btn btn-ghost watched-btn"
-                    onClick={() => onMarkUnwatched?.(progressKey)}
-                  >
-                    <WatchedIcon size={16} /> Watched
-                  </button>
-                ) : (
-                  <>
-                    <button
-                      className="btn btn-ghost"
-                      onClick={() => onMarkWatched?.(progressKey)}
-                    >
-                      ✓ Mark Watched
-                    </button>
-                    {hasProgress && (
-                      <button
-                        className="btn btn-ghost"
-                        style={{ fontSize: 13 }}
-                        onClick={() => {
-                          saveProgress(progressKey, 0);
-                          storage.set("dlTime_" + progressKey, null);
-                        }}
-                      >
-                        ⊘ Not Started
-                      </button>
-                    )}
-                  </>
-                ))}
-              <button className="btn btn-ghost" onClick={onBack}>
-                <BackIcon /> Back
-              </button>
+              {!isUnreleased && !restricted && (
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    if (isWatched) {
+                      onMarkUnwatched?.(progressKey);
+                    } else {
+                      onMarkWatched?.(progressKey);
+                    }
+                  }}
+                >
+                  <WatchedIcon size={18} watched={isWatched} />
+                  {isWatched ? "Unwatch" : "Mark Watched"}
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -852,7 +856,7 @@ export default function MoviePage({
                 style={{
                   position: "absolute",
                   inset: 0,
-                  zIndex: 10,
+                  zIndex: 20,
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
@@ -875,11 +879,12 @@ export default function MoviePage({
               </div>
             )}
             <webview
+              key={playerSource}
               ref={webviewRef}
               src={
                 sourceIsAsync(playerSource)
                   ? resolvedPlayerUrl || "about:blank"
-                  : getSourceUrl(playerSource, "movie", item.id, null, null)
+                  : getSourceUrl(playerSource, "movie", item.id, null, null, anilistData?.id)
               }
               partition="persist:player"
               allowpopups="false"
@@ -897,7 +902,7 @@ export default function MoviePage({
                     : "visible",
               }}
             />
-            {/* Left-side overlay button group, flex row, no fixed px offsets */}
+            <div className="player-drag-handle" />
             <div className="player-overlay-group">
               <button
                 ref={sourceRef}
@@ -1091,7 +1096,7 @@ export default function MoviePage({
       {cast.length > 0 && (
         <div className="section">
           <div className="section-title">Cast</div>
-          <div className="scroll-row">
+          <div className={`scroll-row ${scrollState.cast}`} ref={castRef} onScroll={() => checkScroll(castRef, "cast")}>
             {cast.map((person) => (
               <div key={person.id} className="cast-card">
                 {person.profile_path ? (
@@ -1116,7 +1121,7 @@ export default function MoviePage({
       {similar.length > 0 && onSelect && (
         <div className="section">
           <div className="section-title">Similar</div>
-          <div className="scroll-row">
+          <div className={`scroll-row ${scrollState.similar}`} ref={similarRef} onScroll={() => checkScroll(similarRef, "similar")}>
             {similar.map((movie) => {
               const pk = `movie_${movie.id}`;
               return (

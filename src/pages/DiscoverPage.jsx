@@ -206,23 +206,46 @@ const DiscoverPage = memo(function DiscoverPage({
 
   return (
     <div className="fade-in" style={{ padding: "24px 32px" }}>
-      <div className="section-header" style={{ marginBottom: 24, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1 style={{ fontSize: 32, fontWeight: 800, margin: 0 }}>{title}</h1>
+      <div className="section-header" style={{ 
+        marginBottom: 32, 
+        display: "flex", 
+        justifyContent: "space-between", 
+        alignItems: "flex-end",
+        borderBottom: "1px solid var(--border)",
+        paddingBottom: 24
+      }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <span style={{ 
+            fontSize: 12, 
+            fontWeight: 700, 
+            textTransform: "uppercase", 
+            letterSpacing: 2, 
+            color: "var(--red)" 
+          }}>
+            Explore Content
+          </span>
+          <h1 style={{ fontSize: 36, fontWeight: 800, margin: 0, letterSpacing: "-0.5px" }}>{title}</h1>
+        </div>
         
-        <div style={{ display: "flex", gap: 12 }}>
-          <Dropdown
-            value={genre}
-            options={genres}
-            onChange={setGenre}
-            placeholder="Select Genre"
-          />
-          
-          <Dropdown
-            value={sortBy}
-            options={SORT_OPTIONS}
-            onChange={setSortBy}
-            placeholder="Sort By"
-          />
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--text3)", fontSize: 13, fontWeight: 600 }}>
+            <span>FILTERS</span>
+          </div>
+          <div style={{ display: "flex", gap: 12 }}>
+            <Dropdown
+              value={genre}
+              options={genres}
+              onChange={setGenre}
+              placeholder="All Genres"
+            />
+            
+            <Dropdown
+              value={sortBy}
+              options={SORT_OPTIONS}
+              onChange={setSortBy}
+              placeholder="Sort By"
+            />
+          </div>
         </div>
       </div>
 

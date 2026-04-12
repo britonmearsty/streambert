@@ -273,56 +273,61 @@ body::-webkit-scrollbar,
     width: 100%;
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    padding: 8px 12px;
+    gap: 4px;
+    padding: 8px;
     min-height: 0;
 }
 
 .saved-thumb {
     width: 100%;
-    height: 60px;
-    border-radius: 5px;
+    height: 42px;
+    border-radius: 6px;
     overflow: visible;
     cursor: pointer;
     transition: all 0.2s;
     flex-shrink: 0;
     position: relative;
-    border: 1px solid var(--border);
+    border: 1px solid transparent;
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 4px;
-    background: var(--surface2);
+    gap: 12px;
+    padding: 4px 8px;
+    background: transparent;
 }
 
 .saved-thumb img {
-    border-radius: 4px;
+    border-radius: 3px;
     overflow: hidden;
-    width: 40px;
+    width: 28px;
     height: 100%;
     object-fit: cover;
     flex-shrink: 0;
 }
 
 .saved-thumb .saved-thumb-title {
-    font-size: 12px;
-    color: var(--text);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text2);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     flex: 1;
+    transition: color 0.2s;
 }
 
 .saved-thumb > .no-img {
-    border-radius: 5px;
+    border-radius: 3px;
     overflow: hidden;
-    width: 100%;
+    width: 28px;
     height: 100%;
 }
 
 .saved-thumb:hover {
-    border-color: var(--red);
-    background: var(--red-dim);
+    background: var(--surface2);
+}
+
+.saved-thumb:hover .saved-thumb-title {
+    color: var(--text);
 }
 
 .saved-thumb-tooltip {
@@ -470,7 +475,7 @@ body::-webkit-scrollbar,
 .btn {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
     padding: 10px 24px;
     border-radius: var(--radius);
     font-family: var(--font-body);
@@ -605,7 +610,7 @@ body::-webkit-scrollbar,
 .iptv-brand {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
     font-family: var(--font-display);
     font-size: 18px;
     letter-spacing: 1px;
@@ -653,7 +658,7 @@ body::-webkit-scrollbar,
     transition: all 0.2s;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
 }
 
 .iptv-playlist-tab:hover {
@@ -706,7 +711,7 @@ body::-webkit-scrollbar,
 .iptv-add-btn {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
     padding: 8px 16px;
     background: var(--red);
     border: none;
@@ -746,7 +751,7 @@ body::-webkit-scrollbar,
 .iptv-group-btn {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
     padding: 10px 14px;
     background: transparent;
     border: none;
@@ -896,7 +901,7 @@ body::-webkit-scrollbar,
 .iptv-channel-actions {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
     flex-shrink: 0;
 }
 
@@ -1156,7 +1161,7 @@ body::-webkit-scrollbar,
 .player-page-controls {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
     margin-left: auto;
     opacity: 1;
     transition: opacity 0.3s ease;
@@ -1328,7 +1333,7 @@ body.no-anim *::after {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 8px;
+    gap: 4px;
     color: var(--text3);
 }
 
@@ -1419,14 +1424,122 @@ body.no-anim *::after {
 
 .scroll-row {
     display: flex;
-    gap: 14px;
+    gap: 16px;
     overflow-x: auto;
-    padding-bottom: 8px;
+    padding: 8px 16px 16px;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    position: relative;
+    scroll-behavior: smooth;
+}
+
+.scroll-row::-webkit-scrollbar {
+    display: none;
+}
+
+.scroll-row::before,
+.scroll-row::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 60px;
+    z-index: 5;
+    pointer-events: none;
+    transition: opacity 0.3s;
+}
+
+.scroll-row::before {
+    left: 0;
+    background: linear-gradient(to right, var(--bg) 0%, transparent 100%);
+}
+
+.scroll-row::after {
+    right: 0;
+    background: linear-gradient(to left, var(--bg) 0%, transparent 100%);
+}
+
+.scroll-row.at-start::before {
+    opacity: 0;
+}
+
+.scroll-row.at-end::after {
+    opacity: 0;
+}
+
+.scroll-row::-webkit-scrollbar {
+    display: none;
+}
+
+.scroll-nav {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 60px;
+    z-index: 5;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+    pointer-events: none;
+}
+
+.scroll-nav--left {
+    left: 0;
+    background: linear-gradient(to right, var(--bg) 0%, transparent 100%);
+    justify-content: flex-start;
+    padding-left: 8px;
+}
+
+.scroll-nav--right {
+    right: 0;
+    background: linear-gradient(to left, var(--bg) 0%, transparent 100%);
+    justify-content: flex-end;
+    padding-right: 8px;
+}
+
+.scroll-nav svg {
+    width: 28px;
+    height: 28px;
+    color: var(--text);
+    background: rgba(30, 30, 30, 0.85);
+    border-radius: 50%;
+    padding: 6px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    transition: all 0.15s ease;
+}
+
+.scroll-nav:hover svg {
+    background: var(--surface3);
+    color: var(--red);
+}
+
+.scroll-nav.visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.scroll-nav:disabled {
+    cursor: default;
+    opacity: 0 !important;
+    pointer-events: none;
+}
+
+.scroll-row-wrap {
+    position: relative;
+}
+
+.scroll-row-wrap:hover .scroll-nav {
+    opacity: 1;
 }
 
 .scroll-row .card {
     flex-shrink: 0;
-    width: 150px;
+    width: 160px;
 }
 
 /* ── Search Modal ───────────────────────────────────────────────────────── */
@@ -1862,33 +1975,76 @@ body.no-anim *::after {
 .progress-mark-row {
     margin-top: 10px;
     display: flex;
-    gap: 8px;
+    gap: 4px;
     flex-wrap: wrap;
 }
 
 /* ── Season / Episodes ────────────────────────────────────────────────────── */
 .season-selector {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
     margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
-.season-btn {
-    padding: 7px 18px;
-    border-radius: 20px;
-    font-size: 13px;
+.season-dropdown {
+    padding: 8px 14px;
+    border-radius: var(--radius);
+    font-size: 14px;
     font-weight: 500;
     cursor: pointer;
     border: 1px solid var(--border);
     background: var(--surface2);
-    color: var(--text2);
+    color: var(--text);
+    min-width: 140px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
     transition: all 0.2s;
 }
 
-.season-btn:hover {
+.season-dropdown:hover {
     border-color: var(--text3);
+}
+
+.season-dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 4px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    z-index: 100;
+    min-width: 100%;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.season-dropdown-item {
+    display: block;
+    width: 100%;
+    padding: 10px 14px;
+    font-size: 14px;
+    text-align: left;
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    color: var(--text2);
+    transition: all 0.15s;
+}
+
+.season-dropdown-item:hover {
+    background: var(--surface3);
     color: var(--text);
+}
+
+.season-dropdown-item.active {
+    background: var(--red-dim);
+    color: var(--red);
+    font-weight: 600;
 }
 
 .season-btn.season-watched:hover {
@@ -1910,26 +2066,90 @@ body.no-anim *::after {
 }
 
 .episodes-grid {
-    display: grid;
-    gap: 10px;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    display: flex;
+    gap: 16px;
+    overflow-x: auto;
+    padding: 8px 16px 16px;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+
+.episodes-grid::-webkit-scrollbar {
+    display: none;
 }
 
 .episode-card {
+    flex: 0 0 auto;
+    width: 200px;
+    min-height: 180px;
     display: flex;
-    gap: 12px;
+    flex-direction: column;
+    gap: 10px;
     padding: 12px;
     border-radius: var(--radius);
     background: var(--surface2);
     border: 1px solid var(--border);
-    cursor: pointer;
-    transition: all 0.2s;
-    align-items: flex-start;
+    transition: all 0.25s ease;
+    scroll-snap-align: start;
 }
 
 .episode-card:hover {
     border-color: var(--red);
     background: var(--surface3);
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3), 0 0 0 1px var(--red);
+}
+
+.episode-card:hover .episode-thumb-play {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.episode-card .episode-thumb {
+    width: 100%;
+    aspect-ratio: 16/9;
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+}
+
+.episode-card .episode-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.episode-card .episode-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.episode-card .episode-num {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text2);
+}
+
+.episode-card .episode-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.episode-card .episode-desc {
+    font-size: 11px;
+    color: var(--text3);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin-top: 2px;
 }
 
 .episode-card.playing {
@@ -2029,17 +2249,20 @@ body.no-anim *::after {
     justify-content: center;
     background: rgba(0, 0, 0, 0.5);
     opacity: 0;
-    transition: opacity 0.2s;
+    transition: all 0.2s ease;
+    transform: scale(0.9);
 }
 
 .episode-card:hover .episode-thumb-play {
     opacity: 1;
+    transform: scale(1);
 }
 
 .episode-thumb-play svg {
-    width: 24px;
-    height: 24px;
+    width: 28px;
+    height: 28px;
     color: white;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
 }
 
 .episode-info {
@@ -2231,7 +2454,7 @@ body.no-anim *::after {
 .history-rows {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 4px;
 }
 
 /* ── API Key Setup ───────────────────────────────────────────────────────── */
@@ -2752,7 +2975,7 @@ kbd {
 .download-checking {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
     font-size: 13px;
     color: var(--text3);
     margin-top: 12px;
@@ -2975,7 +3198,7 @@ kbd {
     transition: background 0.12s;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
 }
 
 .context-menu-item:hover {
@@ -3289,7 +3512,7 @@ kbd {
 .age-rating-pill {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
     padding: 6px 14px;
     border-radius: 20px;
     background: rgba(255, 255, 255, 0.08);
@@ -3378,40 +3601,45 @@ kbd {
 
 .cast-card {
     flex: 0 0 auto;
-    width: 100px;
+    width: 130px;
     cursor: pointer;
+    transition: all 0.2s ease;
+    scroll-snap-align: start;
+}
+.cast-card:hover {
+    transform: translateY(-4px);
 }
 .cast-card img {
-    width: 100px;
-    height: 150px;
+    width: 130px;
+    height: 180px;
     object-fit: cover;
-    border-radius: 6px;
+    border-radius: 8px;
     background: var(--surface2);
 }
 .cast-card__placeholder {
-    width: 100px;
-    height: 150px;
+    width: 130px;
+    height: 180px;
     display: flex;
     align-items: center;
     justify-content: center;
     background: var(--surface2);
-    border-radius: 6px;
-    font-size: 28px;
+    border-radius: 8px;
+    font-size: 32px;
     color: var(--text3);
 }
 .cast-card__name {
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 600;
     color: var(--text);
-    margin-top: 8px;
+    margin-top: 10px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 .cast-card__role {
-    font-size: 11px;
+    font-size: 12px;
     color: var(--text3);
-    margin-top: 2px;
+    margin-top: 4px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -3505,7 +3733,7 @@ kbd {
 
 .dl-page__scan-controls {
     display: flex;
-    gap: 8px;
+    gap: 4px;
     align-items: center;
 }
 
@@ -3750,7 +3978,7 @@ kbd {
 .source-dropdown__item {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
     width: 100%;
     background: none;
     border: none;
@@ -3838,7 +4066,7 @@ kbd {
 .anime-override-row {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
     margin-top: 10px;
     padding: 8px 12px;
     background: rgba(139, 92, 246, 0.08);
@@ -3939,7 +4167,7 @@ kbd {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
     transition:
         transform 0.42s cubic-bezier(0.25, 0.46, 0.45, 0.94),
         opacity 0.42s ease;
@@ -4319,7 +4547,7 @@ kbd {
 .blocked-modal-title {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
     font-size: 14px;
     font-weight: 600;
     color: var(--text1);
@@ -4482,4 +4710,247 @@ html[data-win-titlebar][data-maximized] .window-titlebar {
 
 .episode-check-item:hover {
     color: var(--text) !important;
+}
+
+/* ── Dropdown ────────────────────────────────────────────────────────── */
+.dropdown-container {
+    position: relative;
+    min-width: 170px;
+    user-select: none;
+}
+
+.dropdown-trigger {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 10px 16px;
+    border-radius: var(--radius);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    color: var(--text2);
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.dropdown-trigger:hover {
+    background: var(--surface3);
+    border-color: var(--text3);
+    color: var(--text);
+}
+
+.dropdown-trigger--active {
+    background: var(--surface2);
+    border-color: var(--red);
+    color: var(--text);
+    box-shadow: 0 0 0 4px var(--red-dim);
+}
+
+.dropdown-trigger svg {
+    transition: transform 0.25s ease;
+    opacity: 0.6;
+}
+
+.dropdown-trigger--active svg {
+    transform: rotate(180deg);
+    opacity: 1;
+    color: var(--red);
+}
+
+.dropdown-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    background: rgba(26, 26, 26, 0.95);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow-y: auto;
+    max-height: 400px;
+    z-index: 1000;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+    padding: 6px;
+    animation: dropdownSlideIn 0.2s cubic-bezier(0, 0, 0.2, 1);
+    transform-origin: top center;
+}
+
+@keyframes dropdownSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.dropdown-item {
+    padding: 10px 12px;
+    font-size: 13.5px;
+    color: var(--text2);
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 4px;
+}
+
+.dropdown-trigger {
+    height: 44px;
+    padding: 0 18px;
+    font-family: var(--font-body);
+}
+
+.watched-badge-mini {
+    background: rgba(72, 199, 116, 0.12);
+    border-radius: 4px;
+    padding: 2px 4px;
+    display: flex;
+    align-items: center;
+    border: 1px solid rgba(72, 199, 116, 0.2);
+    margin-left: 4px;
+}
+
+.dropdown-item:last-child {
+    margin-bottom: 0;
+}
+
+.dropdown-item:hover {
+    background: var(--surface3);
+    color: var(--text);
+    padding-left: 16px;
+}
+
+.dropdown-item--selected {
+    background: var(--red-dim);
+    color: var(--red);
+    font-weight: 600;
+}
+
+.dropdown-item--selected::after {
+    content: "✓";
+    margin-left: auto;
+    font-size: 14px;
+    font-weight: 800;
+}
+
+/* Custom scrollbar for dropdown menu */
+.dropdown-menu::-webkit-scrollbar {
+    width: 4px;
+}
+
+.dropdown-menu::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 10px;
+}
+
+.dropdown-menu::-webkit-scrollbar-thumb:hover {
+    background: var(--text3);
+}
+
+/* ── Season Dropdown V2 ────────────────────────────────────────────────── */
+.season-selector-v2 {
+    margin-bottom: 28px;
+    max-width: 310px;
+}
+
+.season-selector-v2 .dropdown-menu {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(18, 18, 18, 0.96);
+    backdrop-filter: blur(20px) saturate(180%);
+    box-shadow: 0 25px 60px -12px rgba(0, 0, 0, 0.9), 
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.season-selector-v2 .dropdown-item {
+    border: 1px solid transparent;
+    transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.season-selector-v2 .dropdown-item:hover {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.08);
+    transform: translateX(4px);
+}
+
+.dropdown-item-content {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.dropdown-item-label {
+    font-weight: 500;
+    font-size: 14px;
+}
+
+.dropdown-item-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+}
+
+.dropdown-item-meta .ep-count {
+    background: rgba(255, 255, 255, 0.03);
+    padding: 3px 8px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    color: var(--text2);
+}
+
+.dropdown-item--active {
+    background: linear-gradient(90deg, rgba(229, 9, 20, 0.15) 0%, transparent 100%) !important;
+    color: var(--text);
+}
+
+.dropdown-item--active .dropdown-item-label {
+    color: var(--text);
+    font-weight: 700;
+}
+
+.item-watched .dropdown-item-label {
+    opacity: 0.6;
+}
+
+.item-watched {
+    border-right: 2px solid rgba(72, 199, 116, 0.2) !important;
+}
+
+.player-drag-handle, 
+.player-fs-bar__drag {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 48px;
+    z-index: 1000;
+    -webkit-app-region: drag;
+    pointer-events: none; /* Allow movie events to go through */
+}
+
+.player-overlay-btn, 
+.player-overlay-group, 
+.source-dropdown,
+.btn-restricted,
+.player-overlay-btn--static,
+.player-page-back,
+.player-page-controls,
+.player-page-title,
+.player-fs-bar__controls,
+.player-fs-close,
+.iptv-player-meta {
+    -webkit-app-region: no-drag;
+    pointer-events: auto; /* Ensure buttons still work */
 }

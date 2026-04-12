@@ -136,31 +136,40 @@ export const FolderIcon = () => (
   </svg>
 );
 
-export const WatchedIcon = ({ size = 22 }) => (
-  <svg
-    viewBox="0 0 24 24"
-    width={size}
-    height={size}
-    fill="none"
-    style={{ filter: "drop-shadow(0 0 4px rgba(72,199,116,0.7))" }}
-  >
-    <circle
-      cx="12"
-      cy="12"
-      r="11"
-      fill="#1a2e1a"
-      stroke="#48c774"
-      strokeWidth="1.5"
-    />
-    <path
-      d="M6.5 12.5l3.5 3.5 7-7"
-      stroke="#48c774"
-      strokeWidth="2.2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-);
+export const WatchedIcon = ({ size = 22, watched = true }) => {
+  const color = watched ? "#48c774" : "currentColor";
+  const bg = watched ? "#1a2e1a" : "transparent";
+  const opacity = watched ? 1 : 0.6;
+
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="none"
+      style={{
+        filter: watched ? "drop-shadow(0 0 4px rgba(72,199,116,0.7))" : "none",
+        opacity,
+      }}
+    >
+      <circle
+        cx="12"
+        cy="12"
+        r="11"
+        fill={bg}
+        stroke={color}
+        strokeWidth="1.5"
+      />
+      <path
+        d="M6.5 12.5l3.5 3.5 7-7"
+        stroke={color}
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+};
 
 export const TrailerIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -411,5 +420,29 @@ export const LoaderIcon = ({ size = 24 }) => (
     style={{ animation: "spin 1s linear infinite" }}
   >
     <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+  </svg>
+);
+
+export const VolumeBoostIcon = ({ size = 20, active = false }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={active ? "#ff4d4d" : "currentColor"}
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    style={{ 
+        filter: active ? "drop-shadow(0 0 8px rgba(255,77,77,0.5))" : "none",
+        transition: "all 0.2s ease"
+    }}
+  >
+    <path d="M11 5L6 9H2v6h4l5 4V5z" />
+    <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+    <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+    {active && (
+        <path d="M23 12h-4m2-2v4" stroke="#ff4d4d" strokeWidth="2.5" />
+    )}
   </svg>
 );

@@ -607,6 +607,7 @@ export default function SportsPage({ onBack }) {
           inset: 0;
           -webkit-app-region: drag;
           z-index: -1;
+          pointer-events: none;
         }
         .player-fs-bar__controls {
           -webkit-app-region: no-drag;
@@ -802,6 +803,7 @@ function SportsPlayer({ match, streams, onClose, onSwitchStream }) {
   return (
     <div className="sports-player-wrap player-wrap--fullscreen" onMouseMove={handleMouseMove}>
       <webview
+        key={match.embedUrl}
         ref={webviewRef}
         src={finalUrl}
         partition="persist:player"

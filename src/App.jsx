@@ -1077,6 +1077,9 @@ export default function App() {
           <PlayerPage
             media={activePlayer}
             onBack={() => setActivePlayer(null)}
+            onShowDownload={() => setShowDownload(true)}
+            onSaveProgress={saveProgress}
+            onMarkWatched={markWatched}
           />
         )}
 

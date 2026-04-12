@@ -1,17 +1,16 @@
 /* CustomPlayer overrides — base skin is player.css */
 
-/* Replace preview spinner with a pulsing live dot */
-.media-preview__dot {
-    display: block;
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--media-accent, #e50914);
-    flex-shrink: 0;
-    animation: preview-dot-pulse 1.2s ease-in-out infinite;
-}
+/* Remove the pulsing dot */
+.media-preview__dot { display: none; }
 
-@keyframes preview-dot-pulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50%       { opacity: 0.4; transform: scale(0.65); }
+/* Balance the slider preview */
+.media-preview__thumbnail-wrapper { display: none; }
+.media-preview__time {
+  bottom: 100%;
+  margin-bottom: 4px;
+  background: rgba(0, 0, 0, 0.75);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  white-space: nowrap;
 }
