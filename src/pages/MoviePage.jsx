@@ -102,6 +102,8 @@ export default function MoviePage({
   const [resolvingUrl, setResolvingUrl] = useState(false);
   const [resolveError, setResolveError] = useState(null);
   const [collection, setCollection] = useState(null); // { name, parts }
+  const [cast, setCast] = useState([]);
+  const [similar, setSimilar] = useState([]);
   // Webview loading overlay
   const [webviewLoading, setWebviewLoading] = useState(false);
   const [playerFullscreen, setPlayerFullscreen] = useState(false);
@@ -243,6 +245,38 @@ export default function MoviePage({
       mounted = false;
     };
   }, [details?.belongs_to_collection?.id, apiKey]);
+
+  // Fetch cast
+  useEffect(() => {
+    setCast([]);
+    if (!item.id) return;
+    let mounted = true;
+    tmdbFetch(`/movie/${item.id}/credits`, apiKey)
+      .then((data) => {
+        if (!mounted) return;
+        setCast((data.cast || []).slice(0, 20));
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, [item.id, apiKey]);
+
+  // Fetch similar movies
+  useEffect(() => {
+    setSimilar([]);
+    if (!item.id) return;
+    let mounted = true;
+    tmdbFetch(`/movie/${item.id}/similar`, apiKey)
+      .then((data) => {
+        if (!mounted) return;
+        setSimilar((data.results || []).slice(0, 12));
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, [item.id, apiKey]);
 
   // Reset m3u8 URL, subtitle URL and source menu whenever the movie or source changes
   useEffect(() => {
@@ -1043,6 +1077,53 @@ export default function MoviePage({
                   pk={pk}
                   isCurrent={isCurrent}
                   onSelect={onSelect}
+                  progress={progress[pk] || 0}
+                  watched={watched}
+                  onMarkWatched={onMarkWatched}
+                  onMarkUnwatched={onMarkUnwatched}
+                />
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {cast.length > 0 && (
+        <div className="section">
+          <div className="section-title">Cast</div>
+          <div className="scroll-row">
+            {cast.map((person) => (
+              <div key={person.id} className="cast-card">
+                {person.profile_path ? (
+                  <img
+                    src={imgUrl(person.profile_path, "w185")}
+                    alt={person.name}
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="cast-card__placeholder">
+                    <span>{person.name?.[0] || "?"}</span>
+                  </div>
+                )}
+                <div className="cast-card__name">{person.name}</div>
+                <div className="cast-card__role">{person.character}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {similar.length > 0 && onSelect && (
+        <div className="section">
+          <div className="section-title">Similar</div>
+          <div className="scroll-row">
+            {similar.map((movie) => {
+              const pk = `movie_${movie.id}`;
+              return (
+                <MediaCard
+                  key={movie.id}
+                  item={{ ...movie, media_type: "movie" }}
+                  onClick={() => onSelect(movie)}
                   progress={progress[pk] || 0}
                   watched={watched}
                   onMarkWatched={onMarkWatched}

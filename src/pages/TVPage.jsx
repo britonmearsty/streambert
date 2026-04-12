@@ -46,6 +46,7 @@ import {
 } from "../components/Icons";
 import DownloadModal from "../components/DownloadModal";
 import TrailerModal from "../components/TrailerModal";
+import MediaCard from "../components/MediaCard";
 import BlockedStatsModal from "../components/BlockedStatsModal";
 import { useBlockedStats } from "../utils/useBlockedStats";
 import { storage, STORAGE_KEYS } from "../utils/storage";
@@ -362,6 +363,7 @@ export default function TVPage({
   onMarkUnwatched,
   downloads,
   onGoToDownloads,
+  onSelect,
   onOpenPlayer,
 }) {
   const [details, setDetails] = useState(null);
@@ -377,6 +379,8 @@ export default function TVPage({
   const [showDownload, setShowDownload] = useState(false);
   const [trailerKey, setTrailerKey] = useState(null);
   const [showTrailer, setShowTrailer] = useState(false);
+  const [cast, setCast] = useState([]);
+  const [similar, setSimilar] = useState([]);
   const [m3u8Url, setM3u8Url] = useState(null);
   const [interceptedSubs, setInterceptedSubs] = useState([]);
   const [playerSource, setPlayerSource] = useState(
@@ -526,6 +530,38 @@ export default function TVPage({
           videos.find((v) => v.type === "Trailer" && v.site === "YouTube") ||
           videos.find((v) => v.site === "YouTube");
         if (trailer) setTrailerKey(trailer.key);
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, [item.id, apiKey]);
+
+  // Fetch cast
+  useEffect(() => {
+    setCast([]);
+    if (!item.id) return;
+    let mounted = true;
+    tmdbFetch(`/tv/${item.id}/credits`, apiKey)
+      .then((data) => {
+        if (!mounted) return;
+        setCast((data.cast || []).slice(0, 20));
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, [item.id, apiKey]);
+
+  // Fetch similar shows
+  useEffect(() => {
+    setSimilar([]);
+    if (!item.id) return;
+    let mounted = true;
+    tmdbFetch(`/tv/${item.id}/similar`, apiKey)
+      .then((data) => {
+        if (!mounted) return;
+        setSimilar((data.results || []).slice(0, 12));
       })
       .catch(() => {});
     return () => {
@@ -2020,6 +2056,53 @@ export default function TVPage({
               )}
           </div>
         </>
+      )}
+
+      {cast.length > 0 && (
+        <div className="section">
+          <div className="section-title">Cast</div>
+          <div className="scroll-row">
+            {cast.map((person) => (
+              <div key={person.id} className="cast-card">
+                {person.profile_path ? (
+                  <img
+                    src={imgUrl(person.profile_path, "w185")}
+                    alt={person.name}
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="cast-card__placeholder">
+                    <span>{person.name?.[0] || "?"}</span>
+                  </div>
+                )}
+                <div className="cast-card__name">{person.name}</div>
+                <div className="cast-card__role">{person.character}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {similar.length > 0 && onSelect && (
+        <div className="section">
+          <div className="section-title">Similar Shows</div>
+          <div className="scroll-row">
+            {similar.map((show) => {
+              const pk = `tv_${show.id}`;
+              return (
+                <MediaCard
+                  key={show.id}
+                  item={{ ...show, media_type: "tv" }}
+                  onClick={() => onSelect(show)}
+                  progress={progress[pk] || 0}
+                  watched={watched}
+                  onMarkWatched={onMarkWatched}
+                  onMarkUnwatched={onMarkUnwatched}
+                />
+              );
+            })}
+          </div>
+        </div>
       )}
 
       {showTrailer && trailerKey && (

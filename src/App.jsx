@@ -973,6 +973,7 @@ export default function App() {
                 onMarkUnwatched={markUnwatched}
                 downloads={downloads}
                 onGoToDownloads={handleGoToDownloads}
+                onSelect={handleSelectResult}
                 onOpenPlayer={(media) => setActivePlayer(media)}
               />
             )}

@@ -3376,6 +3376,47 @@ kbd {
     opacity: 0.6;
 }
 
+.cast-card {
+    flex: 0 0 auto;
+    width: 100px;
+    cursor: pointer;
+}
+.cast-card img {
+    width: 100px;
+    height: 150px;
+    object-fit: cover;
+    border-radius: 6px;
+    background: var(--surface2);
+}
+.cast-card__placeholder {
+    width: 100px;
+    height: 150px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--surface2);
+    border-radius: 6px;
+    font-size: 28px;
+    color: var(--text3);
+}
+.cast-card__name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    margin-top: 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.cast-card__role {
+    font-size: 11px;
+    color: var(--text3);
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .dl-progress-pill {
     display: inline-flex;
     align-items: center;
