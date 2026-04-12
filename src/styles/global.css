@@ -60,7 +60,7 @@
     --text: #f0f0f0;
     --text2: #c0c0c0;
     --text3: #909090;
-    --sidebar: 220px;
+    --sidebar: 260px;
     --radius: 8px;
     --font-display: "Bebas Neue", sans-serif;
     --font-body: "DM Sans", sans-serif;
@@ -102,13 +102,12 @@ body,
     bottom: 0;
     width: var(--sidebar);
     background: var(--surface);
-    border-right: 1px solid var(--border);
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 16px 0;
+    padding: 16px 12px;
     gap: 6px;
-    z-index: 100;
+    z-index: 1;
 }
 
 .sidebar-logo {
@@ -167,9 +166,8 @@ body,
 
 .sidebar-btn:hover,
 .sidebar-btn.active {
-    color: var(--red);
-    background: var(--red-dim);
-    box-shadow: 0 0 0 1px var(--red);
+    color: var(--text);
+    background: var(--surface2);
 }
 
 .sidebar-btn .tooltip {
@@ -3619,31 +3617,32 @@ kbd {
 }
 
 /* ── Windows / Linux custom titlebar adjustments ────────────────────────── */
-html[data-win-titlebar] .sidebar {
-    top: 32px;
-}
-
 html[data-win-titlebar] .main {
-    margin-top: 32px;
-    height: calc(100vh - 32px);
+    margin-top: 0;
+    height: 100vh;
 }
 
 html[data-win-titlebar][data-maximized] body {
-    padding: 8px;
+    padding: 0;
 }
 
 html[data-win-titlebar][data-maximized] .sidebar {
-    top: calc(32px + 8px);
-    left: 8px;
-    bottom: 8px;
-    height: auto;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    height: 100vh;
+    border-radius: 0;
 }
 
 html[data-win-titlebar][data-maximized] .main {
-    margin-top: calc(32px + 8px);
-    margin-right: 8px;
-    margin-bottom: 8px;
-    height: calc(100vh - 64px);
+    margin-top: 0;
+    margin-right: 0;
+    margin-bottom: 0;
+    height: 100vh;
+}
+
+html[data-win-titlebar][data-maximized] .window-titlebar {
+    left: var(--sidebar);
 }
 
 ::highlight(settings-search) {
