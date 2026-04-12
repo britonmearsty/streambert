@@ -1,0 +1,17 @@
+/* CustomPlayer overrides — base skin is player.css */
+
+/* Replace preview spinner with a pulsing live dot */
+.media-preview__dot {
+    display: block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--media-accent, #e50914);
+    flex-shrink: 0;
+    animation: preview-dot-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes preview-dot-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.4; transform: scale(0.65); }
+}

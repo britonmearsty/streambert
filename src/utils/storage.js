@@ -73,6 +73,7 @@ export const STORAGE_KEYS = {
   INTRO_SKIP_MODE: "introSkipMode",
   // Cache for new-episode startup check
   EPISODE_RELEASE_CACHE: "episodeReleaseCache",
+  COLLECTIONS: "collections",
 };
 
 export const getApiKey = () => storage.get(STORAGE_KEYS.API_KEY);

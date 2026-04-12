@@ -29,6 +29,14 @@ const TVPage = lazy(() => import("./pages/TVPage"));
 const LibraryPage = lazy(() => import("./pages/LibraryPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const DownloadsPage = lazy(() => import("./pages/DownloadsPage"));
+const SportsPage = lazy(() => import("./pages/SportsPage"));
+const IPTVPage = lazy(() => import("./pages/IPTVPage"));
+const DiscoverPage = lazy(() => import("./pages/DiscoverPage"));
+const ProviderPage = lazy(() => import("./pages/ProviderPage"));
+const PopularPeoplePage = lazy(() => import("./pages/PopularPeoplePage"));
+const PersonPage = lazy(() => import("./pages/PersonPage"));
+const CollectionsPage = lazy(() => import("./pages/CollectionsPage"));
+const CollectionDetailPage = lazy(() => import("./pages/CollectionDetailPage"));
 import { checkForUpdates } from "./utils/updates";
 
 export default function App() {
@@ -973,6 +981,56 @@ export default function App() {
                     prev.map((d) => (d.id === id ? { ...d, ...updates } : d)),
                   )
                 }
+              />
+            )}
+            {page === "sports" && (
+              <SportsPage onBack={navigateBack} />
+            )}
+            {page === "iptv" && (
+              <IPTVPage onBack={navigateBack} />
+            )}
+            {(page === "movies" || page === "tv-shows" || page === "anime" || page === "coming-soon") && (
+              <DiscoverPage
+                type={page}
+                apiKey={apiKey}
+                onSelect={handleSelectResult}
+                progress={progress}
+                watched={watched}
+                onMarkWatched={markWatched}
+                onMarkUnwatched={markUnwatched}
+              />
+            )}
+            {page === "provider" && selected && (
+              <ProviderPage
+                provider={selected}
+                apiKey={apiKey}
+                onSelect={handleSelectResult}
+                onBack={navigateBack}
+                progress={progress}
+                watched={watched}
+                onMarkWatched={markWatched}
+                onMarkUnwatched={markUnwatched}
+              />
+            )}
+            {page === "people" && (
+              <PopularPeoplePage apiKey={apiKey} onNavigate={navigate} />
+            )}
+            {page === "person" && selected && (
+              <PersonPage
+                personId={selected.id}
+                apiKey={apiKey}
+                onBack={navigateBack}
+                onSelect={handleSelectResult}
+              />
+            )}
+            {page === "collections" && (
+              <CollectionsPage onSelect={handleSelectResult} onNavigate={navigate} />
+            )}
+            {page === "collection" && selected && (
+              <CollectionDetailPage
+                collection={selected}
+                onSelect={handleSelectResult}
+                onBack={navigateBack}
               />
             )}
           </Suspense>

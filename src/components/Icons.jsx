@@ -344,3 +344,18 @@ export const SubtitlesIcon = ({ size = 16, ...props }) => (
     <path d="M7 15h4M15 15h2M7 11h2M13 11h4" />
   </svg>
 );
+
+export const IconWeStream = ({ size = 24 }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+  </svg>
+);

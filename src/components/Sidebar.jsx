@@ -132,6 +132,36 @@ export default function Sidebar({
         label="Downloads"
         badge={activeDownloads > 0 ? activeDownloads : null}
       />
+      <SideBtn
+        active={page === "movies"}
+        onClick={() => onNavigate("movies")}
+        icon={<FilmIcon />}
+        label="Movies"
+      />
+      <SideBtn
+        active={page === "tv-shows"}
+        onClick={() => onNavigate("tv-shows")}
+        icon={<FilmIcon />}
+        label="TV Shows"
+      />
+      <SideBtn
+        active={page === "sports"}
+        onClick={() => onNavigate("sports")}
+        icon={<FilmIcon />}
+        label="Sports"
+      />
+      <SideBtn
+        active={page === "iptv"}
+        onClick={() => onNavigate("iptv")}
+        icon={<FilmIcon />}
+        label="Live TV"
+      />
+      <SideBtn
+        active={page === "collections"}
+        onClick={() => onNavigate("collections")}
+        icon={<FilmIcon />}
+        label="Collections"
+      />
 
       <div className="sidebar-sep" />
 
