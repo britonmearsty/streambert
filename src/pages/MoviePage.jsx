@@ -67,6 +67,7 @@ export default function MoviePage({
   downloads,
   onGoToDownloads,
   onSelect,
+  onOpenPlayer,
 }) {
   const [details, setDetails] = useState(null);
   const [playing, setPlaying] = useState(false);
@@ -524,11 +525,23 @@ export default function MoviePage({
   }, [playing, progressKey, watchedThreshold, playerSource, progressViaFrames]);
 
   const handlePlay = useCallback(() => {
-    setM3u8Url(null);
-    setInterceptedSubs([]);
-    setPlaying(true);
-    onHistory({ ...d, media_type: "movie" });
-  }, [d, onHistory]);
+    if (onOpenPlayer) {
+      onOpenPlayer({
+        title: title,
+        name: title,
+        mediaType: "movie",
+        tmdbId: item.id,
+        source: playerSource,
+        progressKey,
+        dubMode,
+      });
+    } else {
+      setM3u8Url(null);
+      setInterceptedSubs([]);
+      setPlaying(true);
+      onHistory({ ...d, media_type: "movie" });
+    }
+  }, [d, onHistory, onOpenPlayer, item.id, playerSource, progressKey, title, dubMode]);
 
   // Intercept fullscreen requests from embedded players (vidsrc / 2embed use
   // the native Fullscreen API which would otherwise fullscreen the entire app).

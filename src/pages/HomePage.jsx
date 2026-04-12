@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import MediaCard from "../components/MediaCard";
-import TrendingCarousel from "../components/TrendingCarousel";
+import HorizontalRow from "../components/HorizontalRow";
 import { PlayIcon, StarIcon } from "../components/Icons";
 import { imgUrl, tmdbFetch } from "../utils/api";
 import { useRatings, getRatingForItem } from "../utils/useRatings";
@@ -265,13 +265,18 @@ export default function HomePage({
         if (id === "similar") {
           if (!similarSource || similarItems.length === 0) return null;
           return (
-            <TrendingCarousel
+            <HorizontalRow
               key="similar"
               items={similarItems}
               title="Similar to"
               titleHighlight={similarSource.title || similarSource.name}
               onSelect={onSelect}
-              ratingsMap={enrichedRatingsMap}
+              progress={progress}
+              watched={watched}
+              onMarkWatched={onMarkWatched}
+              onMarkUnwatched={onMarkUnwatched}
+              getRating={getRating}
+              itemRestricted={itemRestricted}
             />
           );
         }
@@ -279,12 +284,17 @@ export default function HomePage({
         if (id === "trendingMovies") {
           if (trendingMovieItems.length === 0) return null;
           return (
-            <TrendingCarousel
+            <HorizontalRow
               key="trendingMovies"
               items={trendingMovieItems}
               title="Trending Movies"
               onSelect={onSelect}
-              ratingsMap={enrichedRatingsMap}
+              progress={progress}
+              watched={watched}
+              onMarkWatched={onMarkWatched}
+              onMarkUnwatched={onMarkUnwatched}
+              getRating={getRating}
+              itemRestricted={itemRestricted}
             />
           );
         }
@@ -292,12 +302,17 @@ export default function HomePage({
         if (id === "trendingTV") {
           if (trendingTVItems.length === 0) return null;
           return (
-            <TrendingCarousel
+            <HorizontalRow
               key="trendingTV"
               items={trendingTVItems}
               title="Trending Series"
               onSelect={onSelect}
-              ratingsMap={enrichedRatingsMap}
+              progress={progress}
+              watched={watched}
+              onMarkWatched={onMarkWatched}
+              onMarkUnwatched={onMarkUnwatched}
+              getRating={getRating}
+              itemRestricted={itemRestricted}
             />
           );
         }
@@ -305,12 +320,17 @@ export default function HomePage({
         if (id === "topRated") {
           if (topRatedItems.length === 0) return null;
           return (
-            <TrendingCarousel
+            <HorizontalRow
               key="topRated"
               items={topRatedItems}
               title="Top Rated"
               onSelect={onSelect}
-              ratingsMap={enrichedRatingsMap}
+              progress={progress}
+              watched={watched}
+              onMarkWatched={onMarkWatched}
+              onMarkUnwatched={onMarkUnwatched}
+              getRating={getRating}
+              itemRestricted={itemRestricted}
             />
           );
         }

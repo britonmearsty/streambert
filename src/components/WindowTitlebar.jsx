@@ -41,7 +41,7 @@ export default function WindowTitlebar() {
         left: "var(--sidebar)",
         right: 0,
         height: 40,
-        zIndex: 10000,
+        zIndex: 100,
         background: "var(--bg)",
         display: "flex",
         alignItems: "center",

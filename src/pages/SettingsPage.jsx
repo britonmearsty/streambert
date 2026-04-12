@@ -16,6 +16,7 @@ import { checkForUpdates } from "../utils/updates";
 import { HOME_ROWS, loadHomeLayout } from "../utils/homeLayout";
 import { collectBackupData, restoreBackupData } from "../utils/backup";
 import { formatBytes } from "../utils/storage";
+import { HelpCircle, LogOut } from "lucide-react";
 
 // ── Custom Select ─────────────────────────────────────────────────────────────
 function SettingsSelect({ value, onChange, options, style }) {
@@ -670,6 +671,25 @@ function VersionSection() {
         {autoSaved && (
           <span style={{ fontSize: 12, color: "#48c774" }}>✓ Saved</span>
         )}
+      </div>
+
+      <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
+        <button
+          className="btn btn-ghost"
+          onClick={() => onShowShortcuts?.()}
+          style={{ display: "flex", alignItems: "center", gap: 8 }}
+        >
+          <HelpCircle size={16} />
+          Keyboard Shortcuts
+        </button>
+        <button
+          className="btn btn-ghost"
+          onClick={() => window.electron?.quitApp?.()}
+          style={{ display: "flex", alignItems: "center", gap: 8, color: "#e53e3e" }}
+        >
+          <LogOut size={16} />
+          Quit App
+        </button>
       </div>
     </div>
   );
@@ -2755,6 +2775,7 @@ export default function SettingsPage({
   apiKey,
   onChangeApiKey,
   initialSection,
+  onShowShortcuts = () => {},
 }) {
   const [downloadPath, setDownloadPath] = useState(
     () => storage.get(STORAGE_KEYS.DOWNLOAD_PATH) || "",

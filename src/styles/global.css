@@ -61,6 +61,7 @@
     --text2: #c0c0c0;
     --text3: #909090;
     --sidebar: 260px;
+    --titlebar-height: 40px;
     --radius: 8px;
     --font-display: "Bebas Neue", sans-serif;
     --font-body: "DM Sans", sans-serif;
@@ -74,6 +75,14 @@ body,
     color: var(--text);
     font-family: var(--font-body);
     overflow: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+#root::-webkit-scrollbar {
+    display: none;
 }
 
 ::-webkit-scrollbar {
@@ -94,6 +103,14 @@ body,
     background: var(--red);
 }
 
+::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
+::-webkit-scrollbar-button {
+    display: none;
+}
+
 /* ── Sidebar ──────────────────────────────────────────────────────────── */
 .sidebar {
     position: fixed;
@@ -105,9 +122,58 @@ body,
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 16px 12px;
+    padding: 16px 12px 8px;
     gap: 6px;
     z-index: 1;
+}
+
+.sidebar-nav {
+    display: flex;
+    gap: 6px;
+    width: 100%;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 8px;
+}
+
+.sidebar-nav-btn {
+    flex: 1;
+    height: 32px;
+    border-radius: var(--radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: var(--surface2);
+    color: var(--text3);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.sidebar-nav-btn:hover:not(.disabled) {
+    background: var(--surface3);
+    color: var(--text);
+}
+
+.sidebar-nav-btn.disabled {
+    opacity: 0.3;
+    cursor: default;
+}
+
+.sidebar-group {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.sidebar-group-title {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text3);
+    padding: 12px 16px 6px;
 }
 
 .sidebar-logo {
@@ -292,6 +358,8 @@ body,
 .sidebar-bottom {
     margin-top: auto;
     flex-shrink: 0;
+    width: 100%;
+    align-self: stretch;
 }
 
 /* ── Main ──────────────────────────────────────────────────────────────── */
@@ -300,6 +368,7 @@ body,
     height: 100vh;
     overflow-y: auto;
     overflow-x: hidden;
+    padding-top: var(--titlebar-height, 0);
 }
 
 /* ── Hero ──────────────────────────────────────────────────────────────── */
@@ -308,6 +377,8 @@ body,
     height: 500px;
     overflow: hidden;
     background: var(--surface);
+    border-radius: 12px;
+    margin: 16px;
 }
 
 .hero-bg {
@@ -475,11 +546,710 @@ body,
     background: var(--border);
 }
 
+.fab {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--red);
+    color: white;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 0.3s ease;
+    z-index: 1000;
+}
+
+.fab.fab--visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.fab:hover {
+    background: var(--red2);
+    transform: scale(1.1);
+}
+
+/* ── IPTV Page ───────────────────────────────────────────────────────────── */
+.iptv-page {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--bg);
+}
+
+.iptv-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 24px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.iptv-topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.iptv-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-display);
+    font-size: 18px;
+    letter-spacing: 1px;
+}
+
+.iptv-live-dot {
+    width: 8px;
+    height: 8px;
+    background: var(--red);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.iptv-brand-text {
+    color: var(--text);
+}
+
+.iptv-count {
+    font-size: 12px;
+    color: var(--text3);
+    background: var(--surface2);
+    padding: 4px 10px;
+    border-radius: 12px;
+}
+
+.iptv-topbar-center {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.iptv-playlist-tab {
+    padding: 8px 16px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text3);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.iptv-playlist-tab:hover {
+    background: var(--surface3);
+    color: var(--text);
+}
+
+.iptv-playlist-tab.active {
+    background: var(--red-dim);
+    border-color: var(--red);
+    color: var(--red);
+}
+
+.iptv-playlist-tab-remove {
+    font-size: 16px;
+    color: var(--text3);
+    cursor: pointer;
+    padding: 0 4px;
+}
+
+.iptv-playlist-tab-remove:hover {
+    color: var(--red);
+}
+
+.iptv-topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.iptv-icon-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text3);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.iptv-icon-btn:hover {
+    background: var(--surface3);
+    color: var(--text);
+}
+
+.iptv-add-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: var(--red);
+    border: none;
+    border-radius: 6px;
+    color: white;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.iptv-add-btn:hover {
+    background: var(--red2);
+}
+
+.iptv-layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+.iptv-groups {
+    width: 200px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    flex-shrink: 0;
+}
+
+.iptv-groups-inner {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.iptv-group-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    color: var(--text3);
+    font-size: 13px;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.2s;
+}
+
+.iptv-group-btn:hover {
+    background: var(--surface2);
+    color: var(--text);
+}
+
+.iptv-group-btn.active {
+    background: var(--red-dim);
+    color: var(--red);
+}
+
+.iptv-group-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.iptv-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.iptv-search-wrap {
+    display: flex;
+    align-items: center;
+    padding: 16px 24px;
+    gap: 12px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+}
+
+.iptv-search-icon {
+    color: var(--text3);
+    flex-shrink: 0;
+}
+
+.iptv-search {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-size: 14px;
+    outline: none;
+    transition: all 0.2s;
+}
+
+.iptv-search:focus {
+    border-color: var(--red);
+    background: var(--surface3);
+}
+
+.iptv-search::placeholder {
+    color: var(--text3);
+}
+
+.iptv-search-clear {
+    background: none;
+    border: none;
+    color: var(--text3);
+    cursor: pointer;
+    font-size: 16px;
+    padding: 4px;
+}
+
+.iptv-result-count {
+    padding: 12px 24px;
+    font-size: 12px;
+    color: var(--text3);
+    background: var(--bg);
+}
+
+.iptv-channels {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.iptv-channel-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 24px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.iptv-channel-card:hover {
+    background: var(--surface2);
+}
+
+.iptv-channel-logo {
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--surface2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.iptv-channel-logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.iptv-channel-logo-placeholder {
+    font-size: 20px;
+}
+
+.iptv-channel-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.iptv-channel-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.iptv-channel-group {
+    font-size: 12px;
+    color: var(--text3);
+    margin-top: 2px;
+}
+
+.iptv-channel-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.iptv-fav-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text3);
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.iptv-fav-btn:hover {
+    background: var(--surface2);
+    color: #f5c518;
+}
+
+.iptv-fav-btn.active {
+    color: #f5c518;
+    border-color: #f5c518;
+}
+
+.iptv-play-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background: var(--red);
+    border: none;
+    border-radius: 6px;
+    color: white;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.iptv-play-btn:hover {
+    background: var(--red2);
+}
+
+.iptv-play-btn svg {
+    width: 12px;
+    height: 12px;
+}
+
+.iptv-status-msg {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px;
+    gap: 12px;
+    color: var(--text2);
+}
+
+.iptv-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 48px;
+    gap: 16px;
+    text-align: center;
+}
+
+.iptv-empty-icon {
+    font-size: 48px;
+}
+
+.iptv-empty-title {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.iptv-empty-sub {
+    font-size: 14px;
+    color: var(--text3);
+    max-width: 300px;
+}
+
+.iptv-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+}
+
+.iptv-modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    width: 100%;
+    max-width: 480px;
+    overflow: hidden;
+}
+
+.iptv-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+}
+
+.iptv-modal-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.iptv-modal-close {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: var(--text3);
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.iptv-modal-close:hover {
+    background: var(--surface2);
+    color: var(--text);
+}
+
+.iptv-modal-body {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.iptv-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    display: block;
+    margin-bottom: 4px;
+}
+
+.iptv-label-opt {
+    color: var(--text3);
+    font-weight: 400;
+}
+
+.iptv-input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    color: var(--text);
+    font-size: 14px;
+    outline: none;
+    transition: all 0.2s;
+}
+
+.iptv-input:focus {
+    border-color: var(--red);
+    background: var(--surface3);
+}
+
+.iptv-input::placeholder {
+    color: var(--text3);
+}
+
+.iptv-modal-error {
+    color: var(--red);
+    font-size: 12px;
+    padding: 8px 12px;
+    background: rgba(229, 9, 20, 0.1);
+    border-radius: 6px;
+}
+
+.iptv-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 16px 24px;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+}
+
+.iptv-player-wrap {
+    position: fixed;
+    inset: 0;
+    background: #000;
+    z-index: 1000;
+}
+
+.iptv-player-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.iptv-player-title {
+    color: white;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.iptv-player-group {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 12px;
+    padding: 4px 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+}
+
+.player-page {
+    position: fixed;
+    inset: 0;
+    background: #000;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Hide titlebar and sidebar when player is active */
+[data-player-fullscreen] .window-titlebar,
+[data-player-fullscreen] .sidebar {
+    display: none !important;
+}
+
+[data-player-fullscreen] .main {
+    margin-left: 0 !important;
+    padding-top: 0 !important;
+}
+
+.player-page-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 24px;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 10;
+}
+
+.player-page-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    opacity: 1;
+    transition: opacity 0.3s ease;
+}
+
+.player-page-header--hidden .player-page-controls,
+.player-page-header--hidden .player-page-back,
+.player-page-header--hidden .player-page-title {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.player-page .player-overlay-btn {
+    position: relative;
+    top: auto;
+    right: auto;
+}
+
+.player-page-back {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255,255,255,0.1);
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+
+.player-page-back:hover {
+    background: rgba(255,255,255,0.2);
+}
+
+.player-page-title {
+    color: white;
+    font-size: 16px;
+    font-weight: 500;
+}
+
+.player-page-content {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.skeleton {
+    background: var(--surface3);
+    animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+    0% { opacity: 0.5; }
+    50% { opacity: 0.8; }
+    100% { opacity: 0.5; }
+}
+
 /* ── Cards ──────────────────────────────────────────────────────────────── */
 .cards-grid {
     display: grid;
-    gap: 16px;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 20px;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+}
+
+.horizontal-scroll {
+    display: flex;
+    gap: 20px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 12px 0 24px;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+
+.horizontal-scroll::-webkit-scrollbar {
+    display: none;
+    height: 0;
+}
+
+.horizontal-scroll-item {
+    flex-shrink: 0;
+    width: 160px;
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
 }
 
 body.compact-mode .cards-grid {
@@ -515,18 +1285,32 @@ body.no-anim *::after {
     border: 1px solid var(--border);
     transition: all 0.25s;
     position: relative;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
 }
 
 .card:hover {
-    transform: translateY(-4px) scale(1.02);
-    border-color: var(--red);
-    box-shadow: var(--red-glow);
+    transform: translateY(-4px);
+    border-color: var(--text3);
+    background: var(--surface3);
 }
 
 .card-poster {
     aspect-ratio: 2/3;
     overflow: hidden;
     position: relative;
+    width: 100%;
+    flex-shrink: 0;
+}
+
+.card-info {
+    padding: 8px 10px;
+    flex-shrink: 0;
+    height: 60px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 }
 
 .card-poster img {
@@ -587,13 +1371,13 @@ body.no-anim *::after {
 }
 
 .card-info {
-    padding: 10px 12px;
+    padding: 8px 10px;
 }
 
 .card-title {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 500;
-    margin-bottom: 4px;
+    margin-bottom: 2px;
     line-height: 1.3;
     white-space: nowrap;
     overflow: hidden;

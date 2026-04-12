@@ -1,16 +1,20 @@
 import { useState, useRef, useEffect } from "react";
 import { imgUrl } from "../utils/api";
 import {
-  HomeIcon,
-  SearchIcon,
-  HistoryIcon,
-  FilmIcon,
-  SettingsIcon,
-  DownloadsQueueIcon,
-  QuitIcon,
-  BackIcon,
-  HelpIcon,
-} from "./Icons";
+  LayoutGrid,
+  Search,
+  Bookmark,
+  Film,
+  Settings,
+  Download,
+  ChevronLeft,
+  ChevronRight,
+  HelpCircle,
+  Tv,
+  Trophy,
+  Radio,
+  FolderArchive,
+} from "lucide-react";
 
 export default function Sidebar({
   page,
@@ -22,7 +26,8 @@ export default function Sidebar({
   onRemoveSaved,
   canGoBack,
   onBack,
-  onShowShortcuts,
+  canGoForward,
+  onForward,
 }) {
   const [dragOver, setDragOver] = useState(null);
   const dragItem = useRef(null);
@@ -99,120 +104,155 @@ export default function Sidebar({
 
   return (
     <div className="sidebar">
-      {canGoBack && (
-        <SideBtn onClick={onBack} icon={<BackIcon />} label="Back (Ctrl+Z)" showLabel />
-      )}
+      <div className="sidebar-nav">
+        <button
+          className={`sidebar-nav-btn ${!canGoBack ? "disabled" : ""}`}
+          onClick={onBack}
+          disabled={!canGoBack}
+          title="Back"
+        >
+          <ChevronLeft size={16} />
+        </button>
+        <button
+          className={`sidebar-nav-btn ${!canGoForward ? "disabled" : ""}`}
+          onClick={onForward}
+          disabled={!canGoForward}
+          title="Forward"
+        >
+          <ChevronRight size={16} />
+        </button>
+        <button
+          className="sidebar-nav-btn"
+          onClick={onSearch}
+          title="Search"
+        >
+          <Search size={16} />
+        </button>
+      </div>
+      
+      <div className="sidebar-group">
+        <SideBtn
+          active={page === "home"}
+          onClick={() => onNavigate("home")}
+          icon={<LayoutGrid size={20} />}
+          label="Home"
+          showLabel
+        />
+        <SideBtn
+          active={page === "history"}
+          onClick={() => onNavigate("history")}
+          icon={<Bookmark size={20} />}
+          label="History"
+          showLabel
+        />
+        <SideBtn
+          active={page === "downloads"}
+          onClick={() => onNavigate("downloads")}
+          icon={<Download size={20} />}
+          label="Downloads"
+          badge={activeDownloads > 0 ? activeDownloads : null}
+          showLabel
+        />
+      </div>
+      
+      <div className="sidebar-group">
+        <div className="sidebar-group-title">Browse</div>
+        <SideBtn
+          active={page === "movies"}
+          onClick={() => onNavigate("movies")}
+          icon={<Film size={20} />}
+          label="Movies"
+          showLabel
+        />
+        <SideBtn
+          active={page === "tv-shows"}
+          onClick={() => onNavigate("tv-shows")}
+          icon={<Tv size={20} />}
+          label="TV Shows"
+          showLabel
+        />
+        <SideBtn
+          active={page === "anime"}
+          onClick={() => onNavigate("anime")}
+          icon={<Tv size={20} />}
+          label="Anime"
+          showLabel
+        />
+        <SideBtn
+          active={page === "sports"}
+          onClick={() => onNavigate("sports")}
+          icon={<Trophy size={20} />}
+          label="Sports"
+          showLabel
+        />
+        <SideBtn
+          active={page === "iptv"}
+          onClick={() => onNavigate("iptv")}
+          icon={<Radio size={20} />}
+          label="Live TV"
+          showLabel
+        />
+        <SideBtn
+          active={page === "collections"}
+          onClick={() => onNavigate("collections")}
+          icon={<FolderArchive size={20} />}
+          label="Collections"
+          showLabel
+        />
+      </div>
 
-      <SideBtn onClick={onSearch} icon={<SearchIcon />} label="Search  (⌘F)" showLabel />
-      <SideBtn
-        active={page === "home"}
-        onClick={() => onNavigate("home")}
-        icon={<HomeIcon />}
-        label="Home"
-        showLabel
-      />
-      <SideBtn
-        active={page === "history"}
-        onClick={() => onNavigate("history")}
-        icon={<HistoryIcon />}
-        label="Library & History"
-        showLabel
-      />
-      <SideBtn
-        active={page === "downloads"}
-        onClick={() => onNavigate("downloads")}
-        icon={<DownloadsQueueIcon />}
-        label="Downloads"
-        badge={activeDownloads > 0 ? activeDownloads : null}
-        showLabel
-      />
-      <SideBtn
-        active={page === "movies"}
-        onClick={() => onNavigate("movies")}
-        icon={<FilmIcon />}
-        label="Movies"
-        showLabel
-      />
-      <SideBtn
-        active={page === "tv-shows"}
-        onClick={() => onNavigate("tv-shows")}
-        icon={<FilmIcon />}
-        label="TV Shows"
-        showLabel
-      />
-      <SideBtn
-        active={page === "sports"}
-        onClick={() => onNavigate("sports")}
-        icon={<FilmIcon />}
-        label="Sports"
-        showLabel
-      />
-      <SideBtn
-        active={page === "iptv"}
-        onClick={() => onNavigate("iptv")}
-        icon={<FilmIcon />}
-        label="Live TV"
-        showLabel
-      />
-      <SideBtn
-        active={page === "collections"}
-        onClick={() => onNavigate("collections")}
-        icon={<FilmIcon />}
-        label="Collections"
-        showLabel
-      />
-
-      <div className="sidebar-sep" />
-
-      <div className="sidebar-saved">
-        {savedList.map((item, index) => {
-          const key = `${item.media_type}_${item.id}`;
-          const title = item.title || item.name;
-          return (
-            <div
-              key={key}
-              className={`saved-thumb${dragOver === index ? " drag-over" : ""}`}
-              draggable
-              onDragStart={(e) => handleDragStart(e, index)}
-              onDragEnd={handleDragEnd}
-              onDragEnter={(e) => handleDragEnter(e, index)}
-              onDragOver={handleDragOver}
-              onDrop={(e) => handleDrop(e, index)}
-              onClick={() =>
-                onNavigate(item.media_type === "tv" ? "tv" : "movie", item)
-              }
-              onContextMenu={(e) => handleContextMenu(e, item)}
-              onMouseEnter={(e) => handleMouseEnter(e, title)}
-              onMouseLeave={handleMouseLeave}
-              style={{ cursor: "grab", position: "relative" }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 10, width: "100%" }}>
-                {item.poster_path ? (
-                  <img src={imgUrl(item.poster_path, "w200")} alt={title} />
-                ) : (
-                  <div className="no-img" style={{ width: 40, height: "100%", flexShrink: 0 }}>
-                    <FilmIcon />
-                  </div>
+      <div className="sidebar-group">
+        <div className="sidebar-group-title">Saved</div>
+        <div className="sidebar-saved">
+          {savedList.map((item, index) => {
+            const key = `${item.media_type}_${item.id}`;
+            const title = item.title || item.name;
+            return (
+              <div
+                key={key}
+                className={`saved-thumb${dragOver === index ? " drag-over" : ""}`}
+                draggable
+                onDragStart={(e) => handleDragStart(e, index)}
+                onDragEnd={handleDragEnd}
+                onDragEnter={(e) => handleDragEnter(e, index)}
+                onDragOver={handleDragOver}
+                onDrop={(e) => handleDrop(e, index)}
+                onClick={() =>
+                  onNavigate(item.media_type === "tv" ? "tv" : "movie", item)
+                }
+                onContextMenu={(e) => handleContextMenu(e, item)}
+                onMouseEnter={(e) => handleMouseEnter(e, title)}
+                onMouseLeave={handleMouseLeave}
+                style={{ cursor: "grab", position: "relative" }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 10, width: "100%" }}>
+                  {item.poster_path ? (
+                    <img src={imgUrl(item.poster_path, "w200")} alt={title} />
+                  ) : (
+                    <div className="no-img" style={{ width: 40, height: "100%", flexShrink: 0 }}>
+                      <Film size={20} />
+                    </div>
+                  )}
+                  <span className="saved-thumb-title">{title}</span>
+                </div>
+                {dragOver === index && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: 3,
+                      background: "var(--accent, #e50914)",
+                      borderRadius: 2,
+                      pointerEvents: "none",
+                    }}
+                  />
                 )}
-                <span className="saved-thumb-title">{title}</span>
               </div>
-              {dragOver === index && (
-                <div
-                  style={{
-                    position: "absolute",
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    height: 3,
-                    background: "var(--accent, #e50914)",
-                    borderRadius: 2,
-                    pointerEvents: "none",
-                  }}
-                />
-              )}
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
 
       {tooltip && (
@@ -243,30 +283,14 @@ export default function Sidebar({
           </div>
         </div>
       )}
-
       <div className="sidebar-bottom">
-        <SideBtn
-          onClick={onShowShortcuts}
-          icon={<HelpIcon />}
-          label="Help & Shortcuts (?)"
-          showLabel
-        />
         <SideBtn
           active={page === "settings"}
           onClick={() => onNavigate("settings")}
-          icon={<SettingsIcon />}
+          icon={<Settings size={20} />}
           label="Settings"
           showLabel
         />
-        <button
-          className="sidebar-btn"
-          onClick={() => window.electron?.quitApp?.()}
-          title="Quit App"
-          style={{ color: "#e53e3e", marginTop: 4 }}
-        >
-          <QuitIcon />
-          <span className="tooltip">Quit App</span>
-        </button>
       </div>
     </div>
   );
@@ -281,7 +305,6 @@ function SideBtn({ active, onClick, icon, label, badge, showLabel = false }) {
     >
       {icon}
       {showLabel && <span className="sidebar-label">{label}</span>}
-      <span className="tooltip">{label}</span>
       {badge && (
         <span
           style={{

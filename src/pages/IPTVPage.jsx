@@ -304,49 +304,6 @@ export default function IPTVPage({ onBack }) {
   return (
     <>
       <div className="fade-in iptv-page">
-        {/* ── Top bar ── */}
-        <div className="iptv-topbar">
-          <div className="iptv-topbar-left">
-            <div className="iptv-brand">
-              <span className="iptv-live-dot" />
-              <span className="iptv-brand-text">Live TV</span>
-            </div>
-            {totalCount > 0 && (
-              <span className="iptv-count">{totalCount.toLocaleString()} channels</span>
-            )}
-          </div>
-
-          <div className="iptv-topbar-center">
-            {playlists.map((pl) => (
-              <button
-                key={pl.id}
-                className={`iptv-playlist-tab${activePlaylist === pl.id ? " active" : ""}`}
-                onClick={() => { setActivePlaylist(pl.id); setActiveGroup("All"); setSearch(""); }}
-              >
-                {pl.name}
-                {!pl.builtin && (
-                  <span className="iptv-playlist-tab-remove"
-                    onClick={(e) => { e.stopPropagation(); handleRemovePlaylist(pl.id); }}>×</span>
-                )}
-              </button>
-            ))}
-          </div>
-
-          <div className="iptv-topbar-right">
-            {currentPlaylist && (
-              <button className="iptv-icon-btn" onClick={() => handleRefreshPlaylist(currentPlaylist)} title="Refresh playlist">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.49-4.53"/>
-                </svg>
-              </button>
-            )}
-            <button className="iptv-add-btn" onClick={() => setShowAdd(true)}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              Add Playlist
-            </button>
-          </div>
-        </div>
-
         {/* ── Add modal ── */}
         {showAdd && (
           <div className="iptv-modal-overlay" onClick={() => setShowAdd(false)}>

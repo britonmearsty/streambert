@@ -362,6 +362,7 @@ export default function TVPage({
   onMarkUnwatched,
   downloads,
   onGoToDownloads,
+  onOpenPlayer,
 }) {
   const [details, setDetails] = useState(null);
   const [seasonData, setSeasonData] = useState(null);
@@ -1338,23 +1339,39 @@ export default function TVPage({
 
   const playEpisode = useCallback(
     (ep) => {
-      setM3u8Url(null);
-      setInterceptedSubs([]);
-      setResolvedPlayerUrl(null);
-      setResolvingUrl(false);
-      setResolveError(null);
-      setSelectedEp(ep);
-      setPlaying(true);
-      onHistory({
-        ...d,
-        media_type: "tv",
-        season: selectedSeason,
-        episode: ep.episode_number,
-        episodeName: ep.name,
-      });
+      const episodeProgressKey = `tv_${item.id}_s${selectedSeason}e${ep.episode_number}`;
+      
+      if (onOpenPlayer) {
+        onOpenPlayer({
+          title: title,
+          name: `${title} - S${selectedSeason}:E${ep.episode_number} ${ep.name || ""}`.trim(),
+          mediaType: "tv",
+          tmdbId: item.id,
+          season: selectedSeason,
+          episode: ep.episode_number,
+          source: playerSource,
+          progressKey: episodeProgressKey,
+          dubMode,
+        });
+      } else {
+        setM3u8Url(null);
+        setInterceptedSubs([]);
+        setResolvedPlayerUrl(null);
+        setResolvingUrl(false);
+        setResolveError(null);
+        setSelectedEp(ep);
+        setPlaying(true);
+        onHistory({
+          ...d,
+          media_type: "tv",
+          season: selectedSeason,
+          episode: ep.episode_number,
+          episodeName: ep.name,
+        });
+      }
       // d and selectedSeason are stable within a season view; onHistory is useCallback in App
     },
-    [d, selectedSeason, onHistory],
+    [d, selectedSeason, onHistory, onOpenPlayer, item.id, playerSource, title, dubMode],
   );
 
   const handleSetDownloaderFolder = useCallback((folder) => {

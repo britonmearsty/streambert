@@ -37,6 +37,7 @@ const PopularPeoplePage = lazy(() => import("./pages/PopularPeoplePage"));
 const PersonPage = lazy(() => import("./pages/PersonPage"));
 const CollectionsPage = lazy(() => import("./pages/CollectionsPage"));
 const CollectionDetailPage = lazy(() => import("./pages/CollectionDetailPage"));
+import PlayerPage from "./pages/PlayerPage";
 import { checkForUpdates } from "./utils/updates";
 
 export default function App() {
@@ -54,8 +55,12 @@ export default function App() {
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [platform, setPlatform] = useState(null);
 
+  // Active player overlay state
+  const [activePlayer, setActivePlayer] = useState(null);
+
   // Navigation history stack for Ctrl+Z back navigation
   const [navStack, setNavStack] = useState([]);
+  const [forwardStack, setForwardStack] = useState([]);
 
   const [saved, setSaved] = useState(() => storage.get("saved") || {});
   // Separate order array for drag-and-drop reordering
@@ -552,6 +557,27 @@ export default function App() {
     setNavStack((prev) => {
       if (prev.length === 0) return prev;
       const last = prev[prev.length - 1];
+      setForwardStack((f) => [
+        ...f,
+        { page: pageRef.current, selected: selectedRef.current },
+      ]);
+      setPage(last.page);
+      setSelected(last.selected);
+      if (typeof gc === "function") {
+        requestIdleCallback(() => gc(), { timeout: 2000 });
+      }
+      return prev.slice(0, -1);
+    });
+  }, []);
+
+  const navigateForward = useCallback(() => {
+    setForwardStack((prev) => {
+      if (prev.length === 0) return prev;
+      const last = prev[prev.length - 1];
+      setNavStack((n) => [
+        ...n,
+        { page: pageRef.current, selected: selectedRef.current },
+      ]);
       setPage(last.page);
       setSelected(last.selected);
       if (typeof gc === "function") {
@@ -566,6 +592,7 @@ export default function App() {
       ...prev,
       { page: pageRef.current, selected: selectedRef.current },
     ]);
+    setForwardStack([]);
     setSelected(data);
     setPage(pg);
     setShowSearch(false);
@@ -598,6 +625,11 @@ export default function App() {
         e.preventDefault();
         navigateBack();
       }
+      // Ctrl+Shift+Z / Cmd+Shift+Z → navigate forward
+      if ((e.metaKey || e.ctrlKey) && e.key === "z" && e.shiftKey) {
+        e.preventDefault();
+        navigateForward();
+      }
       if ((e.metaKey || e.ctrlKey) && e.key === "r") {
         e.preventDefault();
         window.location.reload();
@@ -605,7 +637,7 @@ export default function App() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [navigateBack]);
+  }, [navigateBack, navigateForward]);
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   const toastTimerRef = useRef(null);
@@ -834,7 +866,8 @@ export default function App() {
           onRemoveSaved={toggleSave}
           canGoBack={navStack.length > 0}
           onBack={navigateBack}
-          onShowShortcuts={() => setShowShortcuts(true)}
+          canGoForward={forwardStack.length > 0}
+          onForward={navigateForward}
         />
 
         <div className="main">
@@ -918,6 +951,7 @@ export default function App() {
                 downloads={downloads}
                 onGoToDownloads={handleGoToDownloads}
                 onSelect={handleSelectResult}
+                onOpenPlayer={(media) => setActivePlayer(media)}
               />
             )}
             {page === "tv" && selected && (
@@ -939,6 +973,7 @@ export default function App() {
                 onMarkUnwatched={markUnwatched}
                 downloads={downloads}
                 onGoToDownloads={handleGoToDownloads}
+                onOpenPlayer={(media) => setActivePlayer(media)}
               />
             )}
             {page === "history" && (
@@ -958,6 +993,7 @@ export default function App() {
                 apiKey={apiKey}
                 onChangeApiKey={changeApiKey}
                 initialSection={selected?.section}
+                onShowShortcuts={() => setShowShortcuts(true)}
               />
             )}
             {page === "downloads" && (
@@ -1035,6 +1071,13 @@ export default function App() {
             )}
           </Suspense>
         </div>
+
+        {activePlayer && (
+          <PlayerPage
+            media={activePlayer}
+            onBack={() => setActivePlayer(null)}
+          />
+        )}
 
         {showSearch && (
           <SearchModal
