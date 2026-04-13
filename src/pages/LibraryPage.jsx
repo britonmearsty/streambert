@@ -1,12 +1,12 @@
-import { useCallback, useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, memo } from "react";
 import MediaCard from "../components/MediaCard";
 import { imgUrl } from "../utils/api";
 import { EyeIcon, WatchedIcon } from "../components/Icons";
-import { useRatings, getRatingForItem } from "../utils/useRatings";
+import { useRatings } from "../utils/useRatings";
 import { isRestricted } from "../utils/ageRating";
 import { storage, STORAGE_KEYS } from "../utils/storage";
 
-export default function LibraryPage({
+function LibraryPage({
   history,
   inProgress,
   saved,
@@ -39,15 +39,6 @@ export default function LibraryPage({
     year: "Newest first",
   };
 
-  const getRating = useCallback(
-    (item) => getRatingForItem(item, ratingsMap),
-    [ratingsMap],
-  );
-  const itemRestricted = useCallback(
-    (item) => isRestricted(getRating(item).minAge, ageLimitSetting),
-    [getRating, ageLimitSetting],
-  );
-
   return (
     <div className="fade-in">
       <div className="library-header">
@@ -61,13 +52,13 @@ export default function LibraryPage({
         <div className="library-section">
           <div className="library-section-title">Continue Watching</div>
           <div className="cards-grid">
-            {inProgress.map((item, i) => {
+            {inProgress.map((item) => {
+              const typeKey = item.media_type === "movie" ? "movie" : "tv";
               const pk =
-                item.media_type === "movie"
+                typeKey === "movie"
                   ? `movie_${item.id}`
                   : `tv_${item.id}_s${item.season}e${item.episode}`;
-              const r = getRating(item);
-              const restr = itemRestricted(item);
+              const r = ratingsMap[`${typeKey}_${item.id}`] || { cert: null, minAge: null };
               return (
                 <MediaCard
                   key={pk}
@@ -78,7 +69,7 @@ export default function LibraryPage({
                   onMarkWatched={onMarkWatched}
                   onMarkUnwatched={onMarkUnwatched}
                   ageRating={r.cert}
-                  restricted={restr}
+                  restricted={isRestricted(r.minAge, ageLimitSetting)}
                 />
               );
             })}
@@ -105,8 +96,7 @@ export default function LibraryPage({
           </div>
           <div className="cards-grid">
             {saved.map((item) => {
-              const r = getRating(item);
-              const restr = itemRestricted(item);
+              const r = ratingsMap[`${item.media_type}_${item.id}`] || { cert: null, minAge: null };
               return (
                 <MediaCard
                   key={`${item.media_type}_${item.id}`}
@@ -116,7 +106,7 @@ export default function LibraryPage({
                   onMarkWatched={onMarkWatched}
                   onMarkUnwatched={onMarkUnwatched}
                   ageRating={r.cert}
-                  restricted={restr}
+                  restricted={isRestricted(r.minAge, ageLimitSetting)}
                 />
               );
             })}
@@ -193,3 +183,5 @@ export default function LibraryPage({
     </div>
   );
 }
+
+export default memo(LibraryPage);

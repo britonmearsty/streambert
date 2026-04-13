@@ -348,7 +348,7 @@ const INJECT_SKIP_CONTROLS = `
 })();
 `;
 
-export default function TVPage({
+function TVPage({
   item,
   apiKey,
   onSave,
@@ -366,6 +366,7 @@ export default function TVPage({
   onGoToDownloads,
   onSelect,
   onOpenPlayer,
+  onNavigate,
 }) {
   const [details, setDetails] = useState(null);
   const [seasonData, setSeasonData] = useState(null);
@@ -1419,7 +1420,7 @@ export default function TVPage({
   const playEpisode = useCallback(
     (ep) => {
       const episodeProgressKey = `tv_${item.id}_s${selectedSeason}e${ep.episode_number}`;
-      
+
       if (onOpenPlayer) {
         onOpenPlayer({
           title: title,
@@ -1499,9 +1500,62 @@ export default function TVPage({
   return (
     <div className="fade-in">
       {loading && (
-        <div className="loader">
-          <div className="spinner" />
-        </div>
+        <>
+          {/* ── Detail-hero skeleton ── */}
+          <div className="detail-hero">
+            <div className="detail-content">
+              <div className="skeleton detail-poster" />
+              <div className="detail-info">
+                <div className="skeleton" style={{ width: 50,   height: 11, borderRadius: 4, marginBottom: 12 }} />
+                <div className="skeleton" style={{ width: "62%", height: 48, borderRadius: 8, marginBottom: 14 }} />
+                <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+                  {[70, 65, 80].map((w, i) => (
+                    <div key={i} className="skeleton" style={{ width: w, height: 26, borderRadius: 20 }} />
+                  ))}
+                </div>
+                <div className="skeleton" style={{ width: 230, height: 16, borderRadius: 4, marginBottom: 12 }} />
+                <div className="skeleton" style={{ width: "88%", height: 13, borderRadius: 4, marginBottom: 6 }} />
+                <div className="skeleton" style={{ width: "76%", height: 13, borderRadius: 4, marginBottom: 24 }} />
+                <div style={{ display: "flex", gap: 12 }}>
+                  <div className="skeleton" style={{ width: 130, height: 44, borderRadius: 8 }} />
+                  <div className="skeleton" style={{ width: 110, height: 44, borderRadius: 8 }} />
+                </div>
+              </div>
+            </div>
+          </div>
+          {/* ── Episodes skeleton ── */}
+          <div className="section">
+            <div className="section-title">
+              <div className="skeleton" style={{ width: 200, height: 22, borderRadius: 6 }} />
+            </div>
+            <div style={{ display: "flex", gap: 16, overflow: "hidden" }}>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} style={{ width: 200, flexShrink: 0 }}>
+                  <div className="skeleton" style={{ aspectRatio: "16/9", borderRadius: 6, marginBottom: 8 }} />
+                  <div className="skeleton" style={{ height: 13, width: "72%", borderRadius: 4, marginBottom: 5 }} />
+                  <div className="skeleton" style={{ height: 11, width: "48%", borderRadius: 4 }} />
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* ── Cast & similar skeleton rows ── */}
+          {[0, 1].map((ri) => (
+            <div key={ri} className="section">
+              <div className="section-title">
+                <div className="skeleton" style={{ width: 200, height: 22, borderRadius: 6 }} />
+              </div>
+              <div style={{ display: "flex", gap: 16, overflow: "hidden" }}>
+                {Array.from({ length: 6 }).map((_, ci) => (
+                  <div key={ci} style={{ width: 110, flexShrink: 0 }}>
+                    <div className="skeleton" style={{ aspectRatio: "2/3", borderRadius: 6, marginBottom: 6 }} />
+                    <div className="skeleton" style={{ height: 12, width: "80%", borderRadius: 4, marginBottom: 4 }} />
+                    <div className="skeleton" style={{ height: 10, width: "55%", borderRadius: 4 }} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </>
       )}
       {!loading && (
         <>
@@ -1590,7 +1644,7 @@ export default function TVPage({
                            // Navigate to season/ep and play
                            setSelectedSeason(next.season);
                            // Because setSelectedSeason is async, we might need to wait or rely on side effects
-                           // Usually, setting season will result in fetch. 
+                           // Usually, setting season will result in fetch.
                            // For now, if it's already the current season, we can play immediately.
                            if (selectedSeason === next.season && currentSeasonEpisodes.length > 0) {
                              const ep = currentSeasonEpisodes.find(e => e.episode_number === next.episode);
@@ -1628,8 +1682,8 @@ export default function TVPage({
                     {isSaved ? <BookmarkFillIcon /> : <BookmarkIcon />}
                     {isSaved ? "Saved" : "Save"}
                   </button>
-                  <button 
-                    className="btn btn-secondary" 
+                  <button
+                    className="btn btn-secondary"
                     onClick={() => {
                       const watchedAll = seasons.every(s => seasonWatchedMap[s.season_number] === "all");
                       if (watchedAll) {
@@ -2191,7 +2245,12 @@ export default function TVPage({
           <div className="section-title">Cast</div>
           <div className="scroll-row">
             {cast.map((person) => (
-              <div key={person.id} className="cast-card">
+              <div
+                key={person.id}
+                className="cast-card"
+                onClick={() => onNavigate?.("person", person)}
+                style={{ cursor: onNavigate ? "pointer" : "default" }}
+              >
                 {person.profile_path ? (
                   <img
                     src={imgUrl(person.profile_path, "w185")}
@@ -2440,3 +2499,6 @@ const EpisodeCard = memo(function EpisodeCard({
     </div>
   );
 });
+
+
+export default memo(TVPage);

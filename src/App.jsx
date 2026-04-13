@@ -14,6 +14,7 @@ import { storage, secureStorage, STORAGE_KEYS } from "./utils/storage";
 import { applyAccentColor } from "./utils/appearance";
 import { collectBackupData } from "./utils/backup";
 import { tmdbFetch, setApiErrorHandlers } from "./utils/api";
+import { loadFavoriteProviders, loadPinnedProviders } from "./utils/providers";
 import { clearAppCaches } from "./utils/storage";
 
 import Sidebar from "./components/Sidebar";
@@ -63,6 +64,8 @@ export default function App() {
   const [forwardStack, setForwardStack] = useState([]);
 
   const [saved, setSaved] = useState(() => storage.get("saved") || {});
+  const [favoriteProviders, setFavoriteProviders] = useState(() => loadFavoriteProviders());
+  const [pinnedProviders, setPinnedProviders] = useState(() => loadPinnedProviders());
   // Separate order array for drag-and-drop reordering
   const [savedOrder, setSavedOrder] = useState(
     () => storage.get("savedOrder") || null,
@@ -602,6 +605,15 @@ export default function App() {
     }
   }, []);
 
+  // Refresh provider lists whenever the user leaves the settings page
+  // (they may have just saved new favourites / pins)
+  useEffect(() => {
+    if (page !== "settings") {
+      setFavoriteProviders(loadFavoriteProviders());
+      setPinnedProviders(loadPinnedProviders());
+    }
+  }, [page]);
+
   // ── Keyboard shortcuts ────────────────────────────────────────────────────
   useEffect(() => {
     const handler = (e) => {
@@ -868,6 +880,8 @@ export default function App() {
           onBack={navigateBack}
           canGoForward={forwardStack.length > 0}
           onForward={navigateForward}
+          pinnedProviders={pinnedProviders}
+          activeProviderId={page === "provider" ? selected?.id : null}
         />
 
         <div className="main">
@@ -929,6 +943,8 @@ export default function App() {
                 onMarkUnwatched={markUnwatched}
                 history={history}
                 apiKey={apiKey}
+                favoriteProviders={favoriteProviders}
+                onNavigate={navigate}
               />
             )}
             {page === "movie" && selected && (
@@ -952,6 +968,7 @@ export default function App() {
                 onGoToDownloads={handleGoToDownloads}
                 onSelect={handleSelectResult}
                 onOpenPlayer={(media) => setActivePlayer(media)}
+                onNavigate={navigate}
               />
             )}
             {page === "tv" && selected && (
@@ -975,6 +992,7 @@ export default function App() {
                 onGoToDownloads={handleGoToDownloads}
                 onSelect={handleSelectResult}
                 onOpenPlayer={(media) => setActivePlayer(media)}
+                onNavigate={navigate}
               />
             )}
             {page === "history" && (
@@ -1061,11 +1079,12 @@ export default function App() {
               />
             )}
             {page === "collections" && (
-              <CollectionsPage onSelect={handleSelectResult} onNavigate={navigate} />
+              <CollectionsPage apiKey={apiKey} onSelect={handleSelectResult} onNavigate={navigate} />
             )}
             {page === "collection" && selected && (
               <CollectionDetailPage
                 collection={selected}
+                apiKey={apiKey}
                 onSelect={handleSelectResult}
                 onBack={navigateBack}
               />

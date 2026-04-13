@@ -2,34 +2,24 @@ import React from "react";
 
 export function SectionGroupHeader({ title, subtitle }) {
   return (
-    <div style={{ marginBottom: 32, marginTop: 4 }}>
+    <div style={{ marginBottom: 28, marginTop: 8, paddingBottom: 16, borderBottom: "1px solid var(--border)" }}>
       <div
         style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 14,
-          marginBottom: subtitle ? 6 : 0,
+          fontSize: 11,
+          fontFamily: "var(--font-display)",
+          letterSpacing: 1.5,
+          color: "var(--red)",
+          textTransform: "uppercase",
+          marginBottom: 4,
         }}
       >
-        <div
-          style={{
-            fontFamily: "var(--font-display)",
-            fontSize: 16,
-            letterSpacing: 2,
-            color: "var(--red)",
-            textTransform: "uppercase",
-            fontWeight: 700,
-            whiteSpace: "nowrap",
-          }}
-        >
-          {title}
-        </div>
-        <div
-          style={{ flex: 1, height: 1, background: "rgba(229,9,20,0.18)" }}
-        />
+        Settings
+      </div>
+      <div style={{ fontSize: 22, fontWeight: 700, color: "var(--text)", marginBottom: subtitle ? 5 : 0 }}>
+        {title}
       </div>
       {subtitle && (
-        <div style={{ fontSize: 12, color: "var(--text3)", lineHeight: 1.5 }}>
+        <div style={{ fontSize: 13, color: "var(--text3)", lineHeight: 1.5 }}>
           {subtitle}
         </div>
       )}

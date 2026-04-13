@@ -1,63 +1,21 @@
-import { useState, useEffect, useRef, useMemo, memo } from "react";
-import MediaCard from "../components/MediaCard";
-import { ChevronLeftIcon, ChevronRightIcon, LoaderIcon } from "../components/Icons";
+import { useState, useEffect, useMemo, useCallback, memo } from "react";
+import HorizontalRow from "../components/HorizontalRow";
+import { PlayIcon, StarIcon } from "../components/Icons";
 import { imgUrl, fetchProviderContent } from "../utils/api";
 import { useRatings } from "../utils/useRatings";
-import { isRestricted } from "../utils/ageRating";
-import { storage, STORAGE_KEYS } from "../utils/storage";
+import { storage } from "../utils/storage";
 
-const MediaRow = memo(function MediaRow({ title, items, onSelect, progress = {}, watched, onMarkWatched, onMarkUnwatched, ratingsMap = {}, ageLimitSetting }) {
-  const rowRef = useRef(null);
+const SECTIONS = [
+  { title: "Popular Movies",  type: "movie", params: {} },
+  { title: "Popular Series",  type: "tv",    params: {} },
+  { title: "Action",          type: "movie", params: { with_genres: "28" } },
+  { title: "Comedy",          type: "movie", params: { with_genres: "35" } },
+  { title: "Drama",           type: "tv",    params: { with_genres: "18" } },
+  { title: "Documentaries",   type: "movie", params: { with_genres: "99" } },
+  { title: "Animation",       type: "movie", params: { with_genres: "16" } },
+];
 
-  const scroll = (dir) => {
-    const el = rowRef.current;
-    if (!el) return;
-    el.scrollBy({ left: dir * 600, behavior: "smooth" });
-  };
-
-  if (!items || items.length === 0) return null;
-  return (
-    <div className="section">
-      <div className="section-header">
-        <div className="section-title">{title}</div>
-        <div className="section-nav">
-          <button className="section-nav-btn" onClick={() => scroll(-1)}><ChevronLeftIcon size={16} /></button>
-          <button className="section-nav-btn" onClick={() => scroll(1)}><ChevronRightIcon size={16} /></button>
-        </div>
-      </div>
-      <div className="cards-row" ref={rowRef}>
-        {items.map((item) => {
-          const type = item.media_type === "tv" ? "tv" : "movie";
-          const rk = `${type}_${item.id}`;
-          const r = ratingsMap[rk] || {};
-          const pk = type === "movie" ? `movie_${item.id}` : `tv_${item.id}_s${item.season}e${item.episode}`;
-          
-          const watchedKey = type === "tv"
-            ? item.season != null && item.episode != null
-              ? `tv_${item.id}_s${item.season}e${item.episode}`
-              : `tv_${item.id}`
-            : `movie_${item.id}`;
-
-          return (
-            <MediaCard
-              key={rk}
-              item={item}
-              onClick={() => onSelect(item)}
-              progress={progress[pk] || 0}
-              isWatched={!!watched?.[watchedKey]}
-              onMarkWatched={onMarkWatched}
-              onMarkUnwatched={onMarkUnwatched}
-              ageRating={r.cert}
-              restricted={isRestricted(r.minAge, ageLimitSetting)}
-            />
-          );
-        })}
-      </div>
-    </div>
-  );
-});
-
-export default function ProviderPage({
+function ProviderPage({
   provider,
   apiKey,
   onSelect,
@@ -68,77 +26,84 @@ export default function ProviderPage({
   onMarkUnwatched,
 }) {
   const [loading, setLoading] = useState(true);
-  const [rows, setRows] = useState([]);
-  const [hero, setHero] = useState(null);
+  const [rows, setRows]       = useState([]);
+  const [hero, setHero]       = useState(null);
 
-  const region = useMemo(() => storage.get(STORAGE_KEYS.WATCH_REGION) || "US", []);
+  const region = useMemo(() => storage.get("watchRegion") || "US", []);
 
   useEffect(() => {
     if (!apiKey || !provider) return;
     setLoading(true);
+    setRows([]);
+    setHero(null);
 
-    const fetchData = async () => {
-      try {
-        const sections = [
-          { title: "Popular Movies", type: "movie", params: {} },
-          { title: "Popular Series", type: "tv", params: {} },
-          { title: "Action", type: "movie", params: { with_genres: "28" } },
-          { title: "Comedy", type: "movie", params: { with_genres: "35" } },
-          { title: "Documentaries", type: "movie", params: { with_genres: "99" } },
-          { title: "Animation", type: "movie", params: { with_genres: "16" } },
-        ];
+    const controller = new AbortController();
 
-        const results = await Promise.all(
-          sections.map(async (s) => {
-            const data = await fetchProviderContent(apiKey, provider.id, s.type, region, s.params);
-            return {
-              title: s.title,
-              items: (data.results || []).map((item) => ({ ...item, media_type: s.type })),
-            };
-          })
-        );
+    Promise.all(
+      SECTIONS.map((s) =>
+        fetchProviderContent(apiKey, provider.id, s.type, region, s.params).then((data) => ({
+          title: s.title,
+          items: (data.results || []).map((item) => ({ ...item, media_type: s.type })),
+        }))
+      )
+    )
+      .then((results) => {
+        if (controller.signal.aborted) return;
+        const filled = results.filter((r) => r.items.length > 0);
+        setRows(filled);
+        const firstWithBackdrop = filled
+          .flatMap((r) => r.items)
+          .find((i) => i.backdrop_path);
+        if (firstWithBackdrop) setHero(firstWithBackdrop);
+      })
+      .catch((e) => { if (e.name !== "AbortError") console.error(e); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
 
-        setRows(results.filter((r) => r.items.length > 0));
-        
-        // Find a good hero backdrop from popular movies
-        const firstMovieRow = results.find(r => r.items.length > 0 && r.items[0].media_type === "movie");
-        if (firstMovieRow) {
-          setHero(firstMovieRow.items[0]);
-        }
-      } catch (e) {
-        console.error("Failed to fetch provider content", e);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [apiKey, provider, region]);
+    return () => controller.abort();
+  }, [apiKey, provider?.id, region]);
 
   const allItems = useMemo(() => rows.flatMap((r) => r.items), [rows]);
   const { ratingsMap, ageLimitSetting } = useRatings(allItems);
 
+  // Stable handlers — hero changes only when a new provider is loaded
+  const handleHeroSelect = useCallback(() => { if (hero) onSelect(hero); }, [hero, onSelect]);
+
+  if (!provider) return null;
+
+  /* ── Loading ── */
   if (loading) {
     return (
       <div className="fade-in">
-        {/* Hero Skeleton */}
-        <div className="hero skeleton" style={{ animation: "none", background: "var(--surface1)" }}>
+        <div className="hero">
+          <div className="hero-bg" style={{ background: "var(--surface1)" }} />
+          <div className="hero-gradient" />
           <div className="hero-content">
-            <div className="skeleton" style={{ width: 100, height: 14, marginBottom: 12 }} />
-            <div className="skeleton" style={{ width: "60%", height: 48, marginBottom: 16 }} />
-            <div className="skeleton" style={{ width: 150, height: 16, marginBottom: 16 }} />
-            <div className="skeleton" style={{ width: "80%", height: 14, marginBottom: 8 }} />
-            <div className="skeleton" style={{ width: "70%", height: 14, marginBottom: 24 }} />
+            <div className="skeleton" style={{ width: 120, height: 14, marginBottom: 14, borderRadius: 6 }} />
+            <div className="skeleton" style={{ width: "55%", height: 52, marginBottom: 16, borderRadius: 8 }} />
+            <div className="skeleton" style={{ width: 180, height: 18, marginBottom: 18, borderRadius: 6 }} />
+            <div className="skeleton" style={{ width: "75%", height: 14, marginBottom: 8, borderRadius: 6 }} />
+            <div className="skeleton" style={{ width: "60%", height: 14, marginBottom: 28, borderRadius: 6 }} />
+            <div style={{ display: "flex", gap: 12 }}>
+              <div className="skeleton" style={{ width: 120, height: 42, borderRadius: 8 }} />
+              <div className="skeleton" style={{ width: 100, height: 42, borderRadius: 8 }} />
+            </div>
           </div>
         </div>
-
-        {/* Rows Skeleton */}
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="section" style={{ padding: "0 24px", marginTop: 40 }}>
-            <div className="skeleton" style={{ width: 200, height: 24, marginBottom: 20 }} />
-            <div style={{ display: "flex", gap: 16, overflow: "hidden" }}>
-              {[1, 2, 3, 4, 5, 6].map((j) => (
-                <div key={j} className="skeleton" style={{ minWidth: 190, height: 285, borderRadius: 10 }} />
+        {/* Row skeletons — one per section that will load */}
+        {[0, 1, 2, 3].map((ri) => (
+          <div key={ri} className="section">
+            <div className="section-title">
+              <div className="skeleton" style={{ width: 200, height: 22, borderRadius: 6 }} />
+            </div>
+            <div className="horizontal-scroll">
+              {Array.from({ length: 7 }).map((_, ci) => (
+                <div key={ci} className="horizontal-scroll-item" style={{ borderRadius: 8, overflow: "hidden", border: "1px solid var(--border)", background: "var(--surface2)" }}>
+                  <div className="skeleton" style={{ aspectRatio: "2/3", borderRadius: 0 }} />
+                  <div style={{ padding: "8px 10px" }}>
+                    <div className="skeleton" style={{ height: 13, width: "78%", borderRadius: 4, marginBottom: 5 }} />
+                    <div className="skeleton" style={{ height: 11, width: "50%", borderRadius: 4 }} />
+                  </div>
+                </div>
               ))}
             </div>
           </div>
@@ -147,35 +112,47 @@ export default function ProviderPage({
     );
   }
 
-  if (!provider) return null;
-
+  /* ── Content ── */
   return (
     <div className="fade-in">
-      <div style={{ paddingTop: 24 }}>
-        {rows.length === 0 && !loading && (
-          <div className="no-results">No content found for this provider.</div>
-        )}
-      </div>
-
-      {!loading && hero && (
-        <div className="hero" style={{ height: "60vh" }}>
-          <div className="hero-bg" style={{ backgroundImage: `url(${imgUrl(hero.backdrop_path, "original")})` }} />
+      {/* Hero — same structure as HomePage */}
+      {hero && (
+        <div className="hero">
+          <div
+            className="hero-bg"
+            style={{ backgroundImage: `url(${imgUrl(hero.backdrop_path, "original")})` }}
+          />
           <div className="hero-gradient" />
           <div className="hero-content">
             <div className="hero-type">Featured on {provider.name}</div>
             <div className="hero-title">{hero.title || hero.name}</div>
-            <div className="hero-overview" style={{ maxWidth: 600 }}>{hero.overview}</div>
+            <div className="hero-meta">
+              <span className="hero-rating">
+                <StarIcon /> {hero.vote_average?.toFixed(1)}
+              </span>
+              <span>{(hero.release_date || hero.first_air_date)?.slice(0, 4)}</span>
+            </div>
+            <div className="hero-overview">{hero.overview}</div>
             <div className="hero-actions">
-              <button className="btn btn-primary" onClick={() => onSelect(hero)}>Watch Now</button>
+              <button className="btn btn-primary" onClick={handleHeroSelect}>
+                <PlayIcon /> Watch Now
+              </button>
+              <button className="btn btn-secondary" onClick={handleHeroSelect}>
+                More Info
+              </button>
             </div>
           </div>
         </div>
       )}
 
+      {rows.length === 0 && (
+        <div className="no-results">No content available for this provider.</div>
+      )}
+
       <div style={{ paddingBottom: 60 }}>
-        {rows.map((row, idx) => (
-          <MediaRow
-            key={idx}
+        {rows.map((row) => (
+          <HorizontalRow
+            key={row.title}
             title={row.title}
             items={row.items}
             onSelect={onSelect}
@@ -191,3 +168,5 @@ export default function ProviderPage({
     </div>
   );
 }
+
+export default memo(ProviderPage);

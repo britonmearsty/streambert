@@ -63,7 +63,7 @@ export const NotificationsSection = React.memo(function NotificationsSection() {
 
       <div
         style={{
-          background: "var(--surface)",
+          background: "var(--surface2)",
           border: "1px solid var(--border)",
           borderRadius: 10,
           padding: "0 16px",

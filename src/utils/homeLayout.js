@@ -11,26 +11,33 @@ export const HOME_ROWS = [
   { id: "topRated", label: "Top Rated" },
 ];
 
-const DEFAULT_ROW_ORDER = HOME_ROWS.map((r) => r.id);
-const DEFAULT_ROW_VISIBLE = Object.fromEntries(
-  HOME_ROWS.map((r) => [r.id, true]),
-);
-
-export function loadHomeLayout() {
+/**
+ * Load the home layout config.
+ *
+ * @param {Array<{id:string, label:string}>} extraRows
+ *   Optional dynamic rows (e.g. provider rows) to include.
+ *   They are appended after the static HOME_ROWS in the default order
+ *   but can be reordered by the user and saved normally.
+ */
+export function loadHomeLayout(extraRows = []) {
+  const allRows = [...HOME_ROWS, ...extraRows];
   const savedOrder = storage.get("homeRowOrder");
   const savedVisible = storage.get("homeRowVisible");
-  const knownIds = new Set(HOME_ROWS.map((r) => r.id));
+  const knownIds = new Set(allRows.map((r) => r.id));
+
+  const defaultOrder = allRows.map((r) => r.id);
+  const defaultVisible = Object.fromEntries(allRows.map((r) => [r.id, true]));
 
   const order = savedOrder
     ? [
         ...savedOrder.filter((id) => knownIds.has(id)),
-        ...DEFAULT_ROW_ORDER.filter((id) => !savedOrder.includes(id)),
+        ...defaultOrder.filter((id) => !savedOrder.includes(id)),
       ]
-    : DEFAULT_ROW_ORDER;
+    : defaultOrder;
 
   const visible = savedVisible
-    ? { ...DEFAULT_ROW_VISIBLE, ...savedVisible }
-    : DEFAULT_ROW_VISIBLE;
+    ? { ...defaultVisible, ...savedVisible }
+    : defaultVisible;
 
   return { order, visible };
 }

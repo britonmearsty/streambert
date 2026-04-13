@@ -1,7 +1,38 @@
-import { useRef, useCallback } from "react";
+import { memo } from "react";
 import MediaCard from "./MediaCard";
+import { isRestricted } from "../utils/ageRating";
 
-export default function HorizontalRow({
+/**
+ * Custom memo comparator: re-render the row only when props that actually
+ * affect its output have changed. Crucially, `ratingsMap` is compared per-item
+ * so loading a rating for Row A's items does NOT re-render Row B.
+ */
+function areEqual(prev, next) {
+  if (
+    prev.items !== next.items ||
+    prev.title !== next.title ||
+    prev.titleHighlight !== next.titleHighlight ||
+    prev.onSelect !== next.onSelect ||
+    prev.progress !== next.progress ||
+    prev.watched !== next.watched ||
+    prev.onMarkWatched !== next.onMarkWatched ||
+    prev.onMarkUnwatched !== next.onMarkUnwatched ||
+    prev.ageLimitSetting !== next.ageLimitSetting
+  ) {
+    return false;
+  }
+  // ratingsMap is a shared object that grows over time.
+  // Only re-render if the rating for one of OUR items changed.
+  if (prev.ratingsMap !== next.ratingsMap) {
+    for (const item of next.items) {
+      const pk = `${item.media_type === "tv" ? "tv" : "movie"}_${item.id}`;
+      if (prev.ratingsMap[pk] !== next.ratingsMap[pk]) return false;
+    }
+  }
+  return true;
+}
+
+export default memo(function HorizontalRow({
   items,
   title,
   titleHighlight,
@@ -10,20 +41,9 @@ export default function HorizontalRow({
   watched,
   onMarkWatched,
   onMarkUnwatched,
-  getRating,
-  itemRestricted,
+  ratingsMap = {},
+  ageLimitSetting,
 }) {
-  const scrollRef = useRef(null);
-
-  const scroll = useCallback((direction) => {
-    if (!scrollRef.current) return;
-    const scrollAmount = 300;
-    scrollRef.current.scrollBy({
-      left: direction === "left" ? -scrollAmount : scrollAmount,
-      behavior: "smooth",
-    });
-  }, []);
-
   if (!items || items.length === 0) return null;
 
   return (
@@ -40,12 +60,12 @@ export default function HorizontalRow({
           )}
         </div>
       </div>
-      <div className="horizontal-scroll" ref={scrollRef}>
+      <div className="horizontal-scroll">
         {items.map((item) => {
           const typeKey = item.media_type === "tv" ? "tv" : "movie";
           const pk = `${typeKey}_${item.id}`;
-          const r = getRating(item);
-          const restr = itemRestricted(item);
+          const r = ratingsMap[pk] || { cert: null, minAge: null };
+          const restricted = isRestricted(r.minAge, ageLimitSetting);
           return (
             <div key={pk} className="horizontal-scroll-item">
               <MediaCard
@@ -56,7 +76,7 @@ export default function HorizontalRow({
                 onMarkWatched={onMarkWatched}
                 onMarkUnwatched={onMarkUnwatched}
                 ageRating={r.cert}
-                restricted={restr}
+                restricted={restricted}
               />
             </div>
           );
@@ -64,4 +84,4 @@ export default function HorizontalRow({
       </div>
     </div>
   );
-}
+}, areEqual);

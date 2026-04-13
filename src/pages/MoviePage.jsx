@@ -50,7 +50,7 @@ import {
   getRatingCountry,
 } from "../utils/ageRating";
 
-export default function MoviePage({
+function MoviePage({
   item,
   apiKey,
   onSave,
@@ -68,6 +68,7 @@ export default function MoviePage({
   onGoToDownloads,
   onSelect,
   onOpenPlayer,
+  onNavigate,
 }) {
   const [details, setDetails] = useState(null);
   const [playing, setPlaying] = useState(false);
@@ -108,13 +109,13 @@ export default function MoviePage({
   const castRef = useRef(null);
   const similarRef = useRef(null);
 
-  const checkScroll = (ref, key) => {
+  const checkScroll = useCallback((ref, key) => {
     if (!ref.current) return;
     const { scrollLeft, scrollWidth, clientWidth } = ref.current;
     const atStart = scrollLeft <= 10;
     const atEnd = scrollLeft + clientWidth >= scrollWidth - 10;
     setScrollState((prev) => ({ ...prev, [key]: atStart && atEnd ? "both" : atEnd ? "start" : atStart ? "end" : "both" }));
-  };
+  }, []);
 
   const scrollBy = (ref, dir, key) => {
     if (!ref.current) return;
@@ -1098,7 +1099,12 @@ export default function MoviePage({
           <div className="section-title">Cast</div>
           <div className={`scroll-row ${scrollState.cast}`} ref={castRef} onScroll={() => checkScroll(castRef, "cast")}>
             {cast.map((person) => (
-              <div key={person.id} className="cast-card">
+              <div
+                key={person.id}
+                className="cast-card"
+                onClick={() => onNavigate?.("person", person)}
+                style={{ cursor: onNavigate ? "pointer" : "default" }}
+              >
                 {person.profile_path ? (
                   <img
                     src={imgUrl(person.profile_path, "w185")}
@@ -1208,3 +1214,5 @@ const CollectionCard = memo(function CollectionCard({
     </div>
   );
 });
+
+export default memo(MoviePage);

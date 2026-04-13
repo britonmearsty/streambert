@@ -1,4 +1,4 @@
-import { forwardRef, isValidElement, useEffect, useRef, useCallback } from "react";
+import { forwardRef, useRef } from "react";
 import {
   createPlayer,
   Poster,
@@ -41,32 +41,27 @@ export default function CustomPlayer({
   const accent = accentColor ? `#${accentColor.replace(/^#/, "")}` : "var(--red)";
   const containerRef = useRef(null);
 
-  const handlePlayerClick = useCallback(() => {
-    const video = containerRef.current?.querySelector("video");
-    if (!video) return;
-    if (video.paused) {
-      video.play().catch(() => {});
-    } else {
-      video.pause();
-    }
-  }, []);
-
   return (
     <Player.Provider>
       <Container
         ref={containerRef}
         className="media-minimal-skin media-minimal-skin--video"
         style={{ "--media-accent": accent, position: "absolute", inset: 0, borderRadius: 0 }}
-        onClick={handlePlayerClick}
+        onClick={() => {
+          const video = containerRef.current?.querySelector("video");
+          if (!video) return;
+          if (video.paused) {
+            video.play().catch(() => {});
+          } else {
+            video.pause();
+          }
+        }}
       >
-        <VideoWithSubs
-          src={src}
-          subtitles={subtitles}
-          startAt={startAt}
-          onTimeUpdate={onTimeUpdate}
-          onEnded={onEnded}
-          audioBoost={audioBoost}
-        />
+        <Video src={src} playsInline autoPlay>
+          {subtitles.map((s) => (
+            <track key={s.lang} kind="subtitles" label={s.lang} srcLang={s.lang} src={s.url} />
+          ))}
+        </Video>
 
         <BufferingIndicator
           render={(props) => (
@@ -100,7 +95,7 @@ export default function CustomPlayer({
               <Tooltip.Root side="top">
                 <Tooltip.Trigger
                   render={
-                    <PlayButton className="media-button--play" render={<Button />}>
+                    <PlayButton className="media-button--play" render={Button}>
                       <RestartIcon className="media-icon media-icon--restart" />
                       <PlayIcon className="media-icon media-icon--play" />
                       <PauseIcon className="media-icon media-icon--pause" />
@@ -113,7 +108,7 @@ export default function CustomPlayer({
               <Tooltip.Root side="top">
                 <Tooltip.Trigger
                   render={
-                    <SeekButton seconds={-SEEK_TIME} className="media-button--seek" render={<Button />}>
+                    <SeekButton seconds={-SEEK_TIME} className="media-button--seek" render={Button}>
                       <span className="media-icon__container">
                         <SeekIcon className="media-icon media-icon--seek media-icon--flipped" />
                         <span className="media-icon__label">{SEEK_TIME}</span>
@@ -129,7 +124,7 @@ export default function CustomPlayer({
               <Tooltip.Root side="top">
                 <Tooltip.Trigger
                   render={
-                    <SeekButton seconds={SEEK_TIME} className="media-button--seek" render={<Button />}>
+                    <SeekButton seconds={SEEK_TIME} className="media-button--seek" render={Button}>
                       <span className="media-icon__container">
                         <SeekIcon className="media-icon media-icon--seek" />
                         <span className="media-icon__label">{SEEK_TIME}</span>
@@ -168,7 +163,7 @@ export default function CustomPlayer({
               <Tooltip.Root side="top">
                 <Tooltip.Trigger
                   render={
-                    <PlaybackRateButton className="media-button--playback-rate" render={<Button />} />
+                    <PlaybackRateButton className="media-button--playback-rate" render={Button} />
                   }
                 />
                 <Tooltip.Popup className="media-tooltip">Toggle playback rate</Tooltip.Popup>
@@ -180,7 +175,7 @@ export default function CustomPlayer({
                 <Tooltip.Root side="top">
                   <Tooltip.Trigger
                     render={
-                      <CaptionsButton className="media-button--captions" render={<Button />}>
+                      <CaptionsButton className="media-button--captions" render={Button}>
                         <CaptionsOffIcon className="media-icon media-icon--captions-off" />
                         <CaptionsOnIcon className="media-icon media-icon--captions-on" />
                       </CaptionsButton>
@@ -193,7 +188,7 @@ export default function CustomPlayer({
               <Tooltip.Root side="top">
                 <Tooltip.Trigger
                   render={
-                    <PiPButton className="media-button--pip" render={<Button />}>
+                    <PiPButton className="media-button--pip" render={Button}>
                       <PipEnterIcon className="media-icon media-icon--pip-enter" />
                       <PipExitIcon className="media-icon media-icon--pip-exit" />
                     </PiPButton>
@@ -205,7 +200,7 @@ export default function CustomPlayer({
               <Tooltip.Root side="top">
                 <Tooltip.Trigger
                   render={
-                    <FullscreenButton className="media-button--fullscreen" render={<Button />}>
+                    <FullscreenButton className="media-button--fullscreen" render={Button}>
                       <FullscreenEnterIcon className="media-icon media-icon--fullscreen-enter" />
                       <FullscreenExitIcon className="media-icon media-icon--fullscreen-exit" />
                     </FullscreenButton>
@@ -220,64 +215,6 @@ export default function CustomPlayer({
         <div className="media-overlay" />
       </Container>
     </Player.Provider>
-  );
-}
-
-// ── VideoWithSubs: renders the video + subtitle tracks + event callbacks ──────
-function VideoWithSubs({ src, subtitles, startAt, onTimeUpdate, onEnded, audioBoost }) {
-  const player = usePlayer((s) => s);
-
-  useEffect(() => {
-    if (!player?.el) return;
-    const video = player.el.querySelector("video");
-    if (!video) return;
-
-    const onLoaded = () => {
-      if (startAt > 0) video.currentTime = startAt;
-      video.play().catch(() => {});
-    };
-    video.addEventListener("loadedmetadata", onLoaded, { once: true });
-
-    const handleTime = () => onTimeUpdate?.(video.currentTime, video.duration);
-    const handleEnd = () => onEnded?.();
-    video.addEventListener("timeupdate", handleTime);
-    video.addEventListener("ended", handleEnd);
-    return () => {
-      video.removeEventListener("timeupdate", handleTime);
-      video.removeEventListener("ended", handleEnd);
-    };
-  }, [player?.el, startAt]);
-
-  useEffect(() => {
-    if (!player?.el) return;
-    const video = player.el.querySelector("video");
-    if (!video) return;
-
-    if (audioBoost && !video._boosted) {
-      try {
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        const ctx = new AudioContext();
-        const source = ctx.createMediaElementSource(video);
-        const gainNode = ctx.createGain();
-        gainNode.gain.value = 2.5;
-        source.connect(gainNode);
-        gainNode.connect(ctx.destination);
-        video._boosted = true;
-        video._gainNode = gainNode;
-      } catch (e) {}
-    } else if (!audioBoost && video._gainNode) {
-      video._gainNode.gain.value = 1.0;
-    }
-  }, [player?.el, audioBoost]);
-
-  return (
-    <div style={{ width: "100%", height: "100%" }} onClick={handleVideoClick} onDoubleClick={handleVideoDoubleClick}>
-      <Video src={src} playsInline autoPlay>
-        {subtitles.map((s) => (
-          <track key={s.lang} kind="subtitles" label={s.lang} srcLang={s.lang} src={s.url} />
-        ))}
-      </Video>
-    </div>
   );
 }
 
@@ -297,15 +234,23 @@ const Button = forwardRef(function Button({ className, ...props }, ref) {
 function VolumePopover({ accent }) {
   const volumeUnsupported = usePlayer((s) => s.volumeAvailability === "unsupported");
 
-  const muteButton = (
-    <MuteButton className="media-button--mute" render={<Button />}>
+  const muteButton = (props) => (
+    <MuteButton {...props} className="media-button--mute" render={Button}>
       <VolumeOffIcon className="media-icon media-icon--volume-off" />
       <VolumeLowIcon className="media-icon media-icon--volume-low" />
       <VolumeHighIcon className="media-icon media-icon--volume-high" />
     </MuteButton>
   );
 
-  if (volumeUnsupported) return muteButton;
+  if (volumeUnsupported) {
+    return (
+      <MuteButton className="media-button--mute" render={Button}>
+        <VolumeOffIcon className="media-icon media-icon--volume-off" />
+        <VolumeLowIcon className="media-icon media-icon--volume-low" />
+        <VolumeHighIcon className="media-icon media-icon--volume-high" />
+      </MuteButton>
+    );
+  }
 
   return (
     <Popover.Root openOnHover delay={200} closeDelay={100} side="top">

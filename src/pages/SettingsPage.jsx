@@ -14,6 +14,14 @@ import { RATING_COUNTRIES } from "../utils/ageRating";
 import { WarningIcon } from "../components/Icons";
 import { checkForUpdates } from "../utils/updates";
 import { HOME_ROWS, loadHomeLayout } from "../utils/homeLayout";
+import {
+  loadFavoriteProviders,
+  saveFavoriteProviders,
+  loadPinnedProviderIds,
+  savePinnedProviderIds,
+  getProviderRows,
+} from "../utils/providers";
+import { tmdbFetch, imgUrl } from "../utils/api";
 import { collectBackupData, restoreBackupData } from "../utils/backup";
 import { formatBytes } from "../utils/storage";
 import { HelpCircle, LogOut } from "lucide-react";
@@ -695,16 +703,158 @@ function VersionSection() {
   );
 }
 
+// ── Favorite Providers Section ────────────────────────────────────────────────
+function ProviderCard({ provider, isFavorite, isPinned, onToggleFavorite, onTogglePinned }) {
+  return (
+    <div
+      style={{
+        background: isFavorite ? "rgba(229,9,20,0.07)" : "var(--surface2)",
+        border: `1px solid ${isFavorite ? "var(--red)" : "var(--border)"}`,
+        borderRadius: 8,
+        padding: "10px 12px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 8,
+        transition: "border-color 0.15s, background 0.15s",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        {provider.logo_path ? (
+          <img
+            src={imgUrl(provider.logo_path, "w45")}
+            alt={provider.name}
+            style={{ width: 32, height: 32, borderRadius: 6, objectFit: "contain", background: "#fff", flexShrink: 0 }}
+          />
+        ) : (
+          <div style={{ width: 32, height: 32, borderRadius: 6, background: "var(--surface3)", flexShrink: 0 }} />
+        )}
+        <span style={{ fontSize: 13, fontWeight: 600, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {provider.name}
+        </span>
+      </div>
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+        <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, color: "var(--text2)" }}>
+          <Toggle value={isFavorite} onChange={onToggleFavorite} />
+          Favourite
+        </label>
+        {isFavorite && (
+          <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 12, color: "var(--text2)" }}>
+            <Toggle value={isPinned} onChange={onTogglePinned} />
+            Pin to sidebar
+          </label>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function FavoriteProvidersSection({ apiKey }) {
+  const [allProviders, setAllProviders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [favorites, setFavorites] = useState(() => new Set(loadFavoriteProviders().map((p) => p.id)));
+  const [pinned, setPinned] = useState(() => new Set(loadPinnedProviderIds()));
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    if (!apiKey) { setLoading(false); return; }
+    Promise.all([
+      tmdbFetch("/watch/providers/movie?language=en-US&watch_region=US", apiKey),
+      tmdbFetch("/watch/providers/tv?language=en-US&watch_region=US", apiKey),
+    ]).then(([movieData, tvData]) => {
+      const seen = new Set();
+      const combined = [...(movieData.results || []), ...(tvData.results || [])]
+        .filter((p) => { if (seen.has(p.provider_id)) return false; seen.add(p.provider_id); return true; })
+        .sort((a, b) => a.display_priority - b.display_priority)
+        .slice(0, 30)
+        .map((p) => ({ id: p.provider_id, name: p.provider_name, logo_path: p.logo_path }));
+      setAllProviders(combined);
+    }).catch(() => {}).finally(() => setLoading(false));
+  }, [apiKey]);
+
+  const toggleFavorite = (provider) => {
+    setFavorites((prev) => {
+      const next = new Set(prev);
+      if (next.has(provider.id)) {
+        next.delete(provider.id);
+        setPinned((p) => { const np = new Set(p); np.delete(provider.id); return np; });
+      } else {
+        next.add(provider.id);
+      }
+      return next;
+    });
+  };
+
+  const togglePinned = (id) => {
+    setPinned((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const handleSave = () => {
+    const favoriteProviders = allProviders.filter((p) => favorites.has(p.id));
+    saveFavoriteProviders(favoriteProviders);
+    savePinnedProviderIds([...pinned]);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  return (
+    <div style={{ marginBottom: 40 }}>
+      <div className="settings-section-title">Streaming Providers</div>
+      <div style={{ fontSize: 13, color: "var(--text3)", marginBottom: 16, lineHeight: 1.6 }}>
+        Select your favourite streaming services. Favourites add a{" "}
+        <em>Trending on…</em> row to the Home page (reorderable in Home Page
+        Layout below). Providers you also <strong>pin</strong> appear as
+        one-click shortcuts in the sidebar.
+      </div>
+
+      {!apiKey && (
+        <div style={{ color: "var(--text3)", fontSize: 13 }}>
+          Set your TMDB API key to load available providers.
+        </div>
+      )}
+
+      {apiKey && loading && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 10 }}>
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="skeleton" style={{ height: 76, borderRadius: 8 }} />
+          ))}
+        </div>
+      )}
+
+      {apiKey && !loading && (
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 10 }}>
+            {allProviders.map((provider) => (
+              <ProviderCard
+                key={provider.id}
+                provider={provider}
+                isFavorite={favorites.has(provider.id)}
+                isPinned={pinned.has(provider.id)}
+                onToggleFavorite={() => toggleFavorite(provider)}
+                onTogglePinned={() => togglePinned(provider.id)}
+              />
+            ))}
+          </div>
+          <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 12 }}>
+            <button className="btn btn-primary" onClick={handleSave}>Save Providers</button>
+            {saved && <span style={{ fontSize: 13, color: "#48c774" }}>✓ Saved</span>}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── Home Layout Section ───────────────────────────────────────────────────────
 function HomeLayoutSection() {
-  const [order, setOrder] = useState(() => {
-    const { order: o } = loadHomeLayout();
-    return o;
-  });
-  const [visible, setVisible] = useState(() => {
-    const { visible: v } = loadHomeLayout();
-    return v;
-  });
+  // Provider rows are dynamic – read once on mount from localStorage
+  const [providerRows] = useState(() => getProviderRows());
+
+  const [order, setOrder] = useState(() => loadHomeLayout(providerRows).order);
+  const [visible, setVisible] = useState(() => loadHomeLayout(providerRows).visible);
   const [saved, setSaved] = useState(false);
   const dragItem = useRef(null);
   const dragOver = useRef(null);
@@ -735,7 +885,9 @@ function HomeLayoutSection() {
     setTimeout(() => setSaved(false), 2000);
   };
 
-  const rowLabels = Object.fromEntries(HOME_ROWS.map((r) => [r.id, r.label]));
+  const rowLabels = Object.fromEntries(
+    [...HOME_ROWS, ...providerRows].map((r) => [r.id, r.label])
+  );
 
   return (
     <div style={{ marginBottom: 40 }}>
@@ -772,7 +924,7 @@ function HomeLayoutSection() {
               display: "flex",
               alignItems: "center",
               gap: 12,
-              background: "var(--surface)",
+              background: "var(--surface2)",
               border: "1px solid var(--border)",
               borderRadius: 8,
               padding: "10px 14px",
@@ -1845,7 +1997,7 @@ function SubtitleSettingsSection() {
           Save
         </button>
         {saved && (
-          <span style={{ fontSize: 13, color: "#4caf50" }}>✓ Saved</span>
+          <span style={{ fontSize: 13, color: "#48c774" }}>✓ Saved</span>
         )}
       </div>
     </div>
@@ -1914,7 +2066,7 @@ function NotificationsSection() {
 
       <div
         style={{
-          background: "var(--surface)",
+          background: "var(--surface2)",
           border: "1px solid var(--border)",
           borderRadius: 10,
           padding: "0 16px",
@@ -1950,34 +2102,24 @@ function NotificationsSection() {
 // ── Section Group Header ──────────────────────────────────────────────────────
 function SectionGroupHeader({ title, subtitle }) {
   return (
-    <div style={{ marginBottom: 32, marginTop: 4 }}>
+    <div style={{ marginBottom: 28, marginTop: 8, paddingBottom: 16, borderBottom: "1px solid var(--border)" }}>
       <div
         style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 14,
-          marginBottom: subtitle ? 6 : 0,
+          fontSize: 11,
+          fontFamily: "var(--font-display)",
+          letterSpacing: 1.5,
+          color: "var(--red)",
+          textTransform: "uppercase",
+          marginBottom: 4,
         }}
       >
-        <div
-          style={{
-            fontFamily: "var(--font-display)",
-            fontSize: 16,
-            letterSpacing: 2,
-            color: "var(--red)",
-            textTransform: "uppercase",
-            fontWeight: 700,
-            whiteSpace: "nowrap",
-          }}
-        >
-          {title}
-        </div>
-        <div
-          style={{ flex: 1, height: 1, background: "rgba(229,9,20,0.18)" }}
-        />
+        Settings
+      </div>
+      <div style={{ fontSize: 22, fontWeight: 700, color: "var(--text)", marginBottom: subtitle ? 5 : 0 }}>
+        {title}
       </div>
       {subtitle && (
-        <div style={{ fontSize: 12, color: "var(--text3)", lineHeight: 1.5 }}>
+        <div style={{ fontSize: 13, color: "var(--text3)", lineHeight: 1.5 }}>
           {subtitle}
         </div>
       )}
@@ -2386,7 +2528,7 @@ function SettingsTopBar({ sectionRefs, contentRef }) {
         position: "sticky",
         top: 0,
         zIndex: 100,
-        background: "var(--bg, #141414)",
+        background: "var(--bg)",
         borderBottom: "1px solid var(--border)",
         padding: "0 48px",
         backdropFilter: "blur(12px)",
@@ -3051,16 +3193,29 @@ export default function SettingsPage({
         {/* Page title */}
         <div
           style={{
+            fontSize: 11,
             fontFamily: "var(--font-display)",
-            fontSize: 48,
-            letterSpacing: 1,
-            marginBottom: 6,
+            letterSpacing: 1.5,
+            color: "var(--red)",
+            textTransform: "uppercase",
+            marginBottom: 4,
           }}
         >
-          SETTINGS
+          Streambert
         </div>
-        <div style={{ color: "var(--text3)", fontSize: 14, marginBottom: 48 }}>
-          App configuration for Streambert
+        <div
+          style={{
+            fontSize: 40,
+            fontWeight: 700,
+            letterSpacing: -0.5,
+            marginBottom: 6,
+            fontFamily: "var(--font-body)",
+          }}
+        >
+          Settings
+        </div>
+        <div style={{ color: "var(--text3)", fontSize: 13, marginBottom: 48 }}>
+          App configuration and preferences
         </div>
 
         {/* ══════════════════════════════════════════════════════════════════ */}
@@ -3380,7 +3535,7 @@ export default function SettingsPage({
             </div>
             <div
               style={{
-                background: "var(--surface)",
+                background: "var(--surface2)",
                 border: "1px solid var(--border)",
                 borderRadius: 10,
                 padding: "0 16px",
@@ -3536,7 +3691,7 @@ export default function SettingsPage({
               </button>
             </div>
             {saved && (
-              <div style={{ marginTop: 10, fontSize: 13, color: "#4caf50" }}>
+              <div style={{ marginTop: 10, fontSize: 13, color: "#48c774" }}>
                 ✓ Saved
               </div>
             )}
@@ -3566,8 +3721,10 @@ export default function SettingsPage({
         <div ref={secInterface} style={{ scrollMarginTop: 80 }}>
           <SectionGroupHeader
             title="Interface"
-            subtitle="Home layout, start page, appearance, and display options"
+            subtitle="Streaming providers, home layout, start page, appearance, and display options"
           />
+          <FavoriteProvidersSection apiKey={apiKey} />
+          <Divider />
           <HomeLayoutSection />
           <Divider />
           <StartPageSection />
@@ -3608,7 +3765,7 @@ export default function SettingsPage({
 
           <div
             style={{
-              background: "var(--surface)",
+              background: "var(--surface2)",
               border: "1px solid var(--border)",
               borderRadius: 10,
               overflow: "hidden",

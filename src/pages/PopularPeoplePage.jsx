@@ -1,9 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef, memo } from "react";
-import MediaCard from "../components/MediaCard";
-import { ChevronLeftIcon, ChevronRightIcon, LoaderIcon, ArrowUpIcon, ChevronDownIcon, StarIcon } from "../components/Icons";
+import { ArrowUpIcon, ChevronDownIcon, StarIcon } from "../components/Icons";
 import { tmdbFetch, imgUrl } from "../utils/api";
-import { useRatings } from "../utils/useRatings";
-import { isRestricted } from "../utils/ageRating";
 
 const DEPARTMENT_OPTIONS = [
   { id: "", name: "All Departments" },
@@ -166,10 +163,38 @@ export default function PopularPeoplePage({
 
   return (
     <div className="fade-in" style={{ padding: "24px 32px" }}>
-      <div className="section-header" style={{ marginBottom: 24, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1 style={{ fontSize: 32, fontWeight: 800, margin: 0 }}>Popular People</h1>
-        
-        
+      <div className="section-header" style={{
+        marginBottom: 32,
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "flex-end",
+        borderBottom: "1px solid var(--border)",
+        paddingBottom: 24
+      }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <span style={{
+            fontSize: 12,
+            fontWeight: 700,
+            textTransform: "uppercase",
+            letterSpacing: 2,
+            color: "var(--red)"
+          }}>
+            Explore People
+          </span>
+          <h1 style={{ fontSize: 36, fontWeight: 800, margin: 0, letterSpacing: "-0.5px" }}>Popular People</h1>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--text3)", fontSize: 13, fontWeight: 600 }}>
+            <span>FILTER</span>
+          </div>
+          <Dropdown
+            value={department}
+            options={DEPARTMENT_OPTIONS}
+            onChange={(val) => { setDepartment(val); setItems([]); setPage(1); setHasMore(true); }}
+            placeholder="All Departments"
+          />
+        </div>
       </div>
 
       <div className="discover-grid" style={{ 
@@ -187,7 +212,13 @@ export default function PopularPeoplePage({
         ))}
 
         {loading && Array.from({ length: 10 }).map((_, i) => (
-          <div key={`skeleton-${i}`} className="skeleton" style={{ height: 260, borderRadius: 10 }} />
+          <div key={`skeleton-${i}`} style={{ borderRadius: 8, overflow: "hidden", border: "1px solid var(--border)", background: "var(--surface2)" }}>
+            <div className="skeleton" style={{ aspectRatio: "2/3", borderRadius: 0 }} />
+            <div style={{ padding: "8px 10px" }}>
+              <div className="skeleton" style={{ height: 13, width: "80%", borderRadius: 4, marginBottom: 5 }} />
+              <div className="skeleton" style={{ height: 11, width: "60%", borderRadius: 4 }} />
+            </div>
+          </div>
         ))}
       </div>
 

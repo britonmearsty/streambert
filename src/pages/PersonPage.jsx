@@ -1,70 +1,44 @@
 import {
   useState,
   useEffect,
-  useLayoutEffect,
   useRef,
   useMemo,
+  useCallback,
   memo,
 } from "react";
-import {
-  tmdbFetch,
-  imgUrl,
-} from "../utils/api";
+import { tmdbFetch, imgUrl } from "../utils/api";
 import MediaCard from "../components/MediaCard";
-import {
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  LoaderIcon,
-  StarIcon,
-  CalendarIcon,
-  CloseIcon,
-  ArrowUpIcon,
-  PlayIcon,
-} from "../components/Icons";
+import { StarIcon, ArrowUpIcon } from "../components/Icons";
 
-const ScrollRow = memo(function ScrollRow({ title, items, onSelect, className = "cards-row" }) {
-  const rowRef = useRef(null);
-  const scroll = (dir) => {
-    const el = rowRef.current;
-    if (!el) return;
-    el.scrollBy({ left: dir * 600, behavior: "smooth" });
-  };
+const BIO_LIMIT = 400;
 
-  if (!items || items.length === 0) return null;
+// Pure utility — hoisted so it is not re-created on every render
+const getYear = (date) => date?.slice(0, 4);
 
-  return (
-    <div className="section">
-      <div className="section-header">
-        <div className="section-title">{title}</div>
-        <div className="section-nav">
-          <button className="section-nav-btn" onClick={() => scroll(-1)}><ChevronLeftIcon size={16} /></button>
-          <button className="section-nav-btn" onClick={() => scroll(1)}><ChevronRightIcon size={16} /></button>
-        </div>
-      </div>
-      <div className={className} ref={rowRef}>
-        {items.map((item) => (
-          <MediaCard
-            key={item.id}
-            item={item}
-            onClick={() => onSelect(item)}
-          />
-        ))}
-      </div>
-    </div>
-  );
-});
-
-export default function PersonPage({
-  personId,
-  apiKey,
-  onBack,
-  onSelect,
-}) {
+function PersonPage({ personId, apiKey, onBack, onSelect }) {
   const [loading, setLoading] = useState(true);
   const [person, setPerson] = useState(null);
   const [movieCredits, setMovieCredits] = useState({});
   const [tvCredits, setTvCredits] = useState({});
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [showFullBio, setShowFullBio] = useState(false);
+  const [scrollState, setScrollState] = useState({ movies: "both", tv: "both", movieCrew: "both", tvCrew: "both" });
+
+  const moviesRef = useRef(null);
+  const tvRef = useRef(null);
+  const movieCrewRef = useRef(null);
+  const tvCrewRef = useRef(null);
+
+  const checkScroll = useCallback((ref, key) => {
+    if (!ref.current) return;
+    const { scrollLeft, scrollWidth, clientWidth } = ref.current;
+    const atStart = scrollLeft <= 10;
+    const atEnd = scrollLeft + clientWidth >= scrollWidth - 10;
+    setScrollState((prev) => ({
+      ...prev,
+      [key]: atStart && atEnd ? "both" : atEnd ? "start" : atStart ? "end" : "both",
+    }));
+  }, []);
 
   useEffect(() => {
     const mainEl = document.querySelector(".main");
@@ -82,6 +56,10 @@ export default function PersonPage({
   useEffect(() => {
     if (!apiKey || !personId) return;
     setLoading(true);
+    setPerson(null);
+    setMovieCredits({});
+    setTvCredits({});
+    setShowFullBio(false);
 
     const controller = new AbortController();
     Promise.all([
@@ -102,50 +80,97 @@ export default function PersonPage({
     return () => controller.abort();
   }, [apiKey, personId]);
 
-  const getYear = (date) => date?.slice(0, 4);
+  const movieCast = useMemo(() =>
+    (movieCredits.cast || [])
+      .sort((a, b) => (b.popularity || 0) - (a.popularity || 0))
+      .slice(0, 20).map((i) => ({ ...i, media_type: "movie" })),
+    [movieCredits]);
+  const movieCrew = useMemo(() =>
+    (movieCredits.crew || [])
+      .sort((a, b) => (b.popularity || 0) - (a.popularity || 0))
+      .slice(0, 10).map((i) => ({ ...i, media_type: "movie" })),
+    [movieCredits]);
+  const tvCast = useMemo(() =>
+    (tvCredits.cast || [])
+      .sort((a, b) => (b.popularity || 0) - (a.popularity || 0))
+      .slice(0, 20).map((i) => ({ ...i, media_type: "tv" })),
+    [tvCredits]);
+  const tvCrew = useMemo(() =>
+    (tvCredits.crew || [])
+      .sort((a, b) => (b.popularity || 0) - (a.popularity || 0))
+      .slice(0, 10).map((i) => ({ ...i, media_type: "tv" })),
+    [tvCredits]);
 
-  const movieCast = useMemo(() => (movieCredits.cast || []).slice(0, 20).map((i) => ({ ...i, media_type: "movie" })), [movieCredits]);
-  const movieCrew = useMemo(() => (movieCredits.crew || []).slice(0, 10).map((i) => ({ ...i, media_type: "movie" })), [movieCredits]);
-  const tvCast = useMemo(() => (tvCredits.cast || []).slice(0, 20).map((i) => ({ ...i, media_type: "tv" })), [tvCredits]);
-  const tvCrew = useMemo(() => (tvCredits.crew || []).slice(0, 10).map((i) => ({ ...i, media_type: "tv" })), [tvCredits]);
-
-  const allCredits = useMemo(() => [...movieCast, ...tvCast], [movieCast, tvCast]);
-
-  const birthday = person?.birthday ? new Date(person.birthday) : null;
-  const deathday = person?.deathday ? new Date(person.deathday) : null;
-  const age = birthday && !deathday ? Math.floor((Date.now() - birthday.getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : null;
-  const deathAge = birthday && deathday ? Math.floor((deathday.getTime() - birthday.getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : null;
+  const birthday = person?.birthday ? new Date(person.birthday + "T12:00:00") : null;
+  const deathday = person?.deathday ? new Date(person.deathday + "T12:00:00") : null;
+  const age = birthday && !deathday
+    ? Math.floor((Date.now() - birthday.getTime()) / (365.25 * 24 * 60 * 60 * 1000))
+    : null;
+  const deathAge = birthday && deathday
+    ? Math.floor((deathday.getTime() - birthday.getTime()) / (365.25 * 24 * 60 * 60 * 1000))
+    : null;
 
   if (loading) {
     return (
       <div className="fade-in">
+        {/* ── Detail-hero skeleton — mirrors person hero layout ── */}
         <div className="detail-hero">
           <div className="detail-content">
-            <div className="skeleton" style={{ width: 200, height: 300, borderRadius: 12 }} />
+            <div className="skeleton detail-poster" />
             <div className="detail-info">
-              <div className="skeleton" style={{ width: 300, height: 36, marginBottom: 16 }} />
-              <div className="skeleton" style={{ width: 200, height: 20, marginBottom: 24 }} />
-              <div className="skeleton" style={{ width: "100%", height: 100 }} />
+              <div className="skeleton" style={{ width: 50,   height: 11, borderRadius: 4, marginBottom: 12 }} />
+              <div className="skeleton" style={{ width: "58%", height: 46, borderRadius: 8, marginBottom: 14 }} />
+              <div className="skeleton" style={{ width: 110,  height: 26, borderRadius: 20, marginBottom: 16 }} />
+              <div className="skeleton" style={{ width: 220,  height: 16, borderRadius: 4, marginBottom: 14 }} />
+              <div className="skeleton" style={{ width: "92%", height: 13, borderRadius: 4, marginBottom: 6 }} />
+              <div className="skeleton" style={{ width: "84%", height: 13, borderRadius: 4, marginBottom: 6 }} />
+              <div className="skeleton" style={{ width: "70%", height: 13, borderRadius: 4 }} />
             </div>
           </div>
         </div>
+        {/* ── Credit row skeletons — one per credit section ── */}
+        {[0, 1, 2].map((ri) => (
+          <div key={ri} className="section">
+            <div className="section-title">
+              <div className="skeleton" style={{ width: 200, height: 22, borderRadius: 6 }} />
+            </div>
+            <div style={{ display: "flex", gap: 16, overflow: "hidden" }}>
+              {Array.from({ length: 7 }).map((_, ci) => (
+                <div key={ci} style={{ width: 130, flexShrink: 0, borderRadius: 8, overflow: "hidden", border: "1px solid var(--border)", background: "var(--surface2)" }}>
+                  <div className="skeleton" style={{ aspectRatio: "2/3", borderRadius: 0 }} />
+                  <div style={{ padding: "6px 8px" }}>
+                    <div className="skeleton" style={{ height: 12, width: "80%", borderRadius: 4, marginBottom: 4 }} />
+                    <div className="skeleton" style={{ height: 10, width: "52%", borderRadius: 4 }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
     );
   }
 
   if (!person) return null;
 
+  const popularityScore = person.popularity
+    ? Math.min(person.popularity / 10, 10).toFixed(1)
+    : null;
+
   return (
     <div className="fade-in">
       <div className="detail-hero">
-        <div className="detail-bg" style={{ backgroundImage: person.profile_path ? `url(${imgUrl(person.profile_path, "w1280")})` : "none" }} />
+        <div
+          className="detail-bg"
+          style={{ backgroundImage: person.profile_path ? `url(${imgUrl(person.profile_path, "w1280")})` : "none" }}
+        />
         <div className="detail-gradient" />
         <div className="detail-content">
           <div className="detail-poster">
             {person.profile_path ? (
               <img src={imgUrl(person.profile_path, "h632")} alt={person.name} loading="lazy" />
             ) : (
-              <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--surface3)" }}>
+              <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--surface3)", color: "var(--text3)" }}>
                 <StarIcon size={48} />
               </div>
             )}
@@ -154,81 +179,104 @@ export default function PersonPage({
             <div className="detail-type">Person</div>
             <div className="detail-title">{person.name}</div>
 
-            {birthday && (
-              <div className="detail-meta">
-                <CalendarIcon size={14} />
-                <span>
-                  {getYear(person.birthday)}
-                  {person.deathday && ` - ${getYear(person.deathday)}`}
-                  {age && ` (${age} years old)`}
-                  {deathAge && ` (${deathAge} years at death)`}
-                </span>
-              </div>
-            )}
-
-            {person.place_of_birth && (
-              <div className="detail-meta" style={{ marginTop: 8 }}>
-                <span style={{ color: "var(--text3)" }}>Born: {person.place_of_birth}</span>
-              </div>
-            )}
-
             {person.known_for_department && (
-              <div className="genres" style={{ marginTop: 12 }}>
+              <div className="genres">
                 <span className="genre-tag">{person.known_for_department}</span>
               </div>
             )}
 
+            <div className="detail-meta">
+              {popularityScore && (
+                <span className="detail-rating">
+                  <StarIcon size={14} /> {popularityScore}
+                </span>
+              )}
+              {birthday && (
+                <span>
+                  {getYear(person.birthday)}
+                  {person.deathday ? ` – ${getYear(person.deathday)}` : ""}
+                  {age ? ` (age ${age})` : ""}
+                  {deathAge ? ` (died age ${deathAge})` : ""}
+                </span>
+              )}
+              {person.place_of_birth && <span>{person.place_of_birth}</span>}
+            </div>
+
             {person.biography && (
               <>
-                <div className="detail-overview" style={{ marginTop: 16 }}>{person.biography}</div>
-                {person.biography.length > 200 && (
-                  <span className="more-link" onClick={() => {}}>Read More</span>
+                <p className="detail-overview">
+                  {showFullBio || person.biography.length <= BIO_LIMIT
+                    ? person.biography
+                    : `${person.biography.slice(0, BIO_LIMIT).trimEnd()}…`}
+                </p>
+                {person.biography.length > BIO_LIMIT && (
+                  <span className="more-link" onClick={() => setShowFullBio((v) => !v)}>
+                    {showFullBio ? "Show Less" : "Read More"}
+                  </span>
                 )}
               </>
-            )}
-
-            {allCredits.length > 0 && (
-              <div style={{ marginTop: 16, color: "var(--text2)", fontSize: 13 }}>
-                Known for {allCredits.length} titles
-              </div>
             )}
           </div>
         </div>
       </div>
 
-      {!loading && (
-        <div style={{ paddingBottom: 60 }}>
-          {movieCast.length > 0 && (
-            <ScrollRow
-              title="Movie Credits"
-              items={movieCast}
-              onSelect={onSelect}
-            />
-          )}
+      {movieCast.length > 0 && (
+        <div className="section">
+          <div className="section-title">Movie Credits</div>
+          <div
+            className={`scroll-row ${scrollState.movies}`}
+            ref={moviesRef}
+            onScroll={() => checkScroll(moviesRef, "movies")}
+          >
+            {movieCast.map((item) => (
+              <MediaCard key={item.id} item={item} onClick={() => onSelect(item)} />
+            ))}
+          </div>
+        </div>
+      )}
 
-          {tvCast.length > 0 && (
-            <ScrollRow
-              title="TV Show Credits"
-              items={tvCast}
-              onSelect={onSelect}
-            />
-          )}
+      {tvCast.length > 0 && (
+        <div className="section">
+          <div className="section-title">TV Credits</div>
+          <div
+            className={`scroll-row ${scrollState.tv}`}
+            ref={tvRef}
+            onScroll={() => checkScroll(tvRef, "tv")}
+          >
+            {tvCast.map((item) => (
+              <MediaCard key={item.id} item={item} onClick={() => onSelect(item)} />
+            ))}
+          </div>
+        </div>
+      )}
 
-          {movieCrew.length > 0 && (
-            <ScrollRow
-              title="Movie Crew"
-              items={movieCrew}
-              onSelect={onSelect}
-            />
-          )}
+      {movieCrew.length > 0 && (
+        <div className="section">
+          <div className="section-title">Crew (Movies)</div>
+          <div
+            className={`scroll-row ${scrollState.movieCrew}`}
+            ref={movieCrewRef}
+            onScroll={() => checkScroll(movieCrewRef, "movieCrew")}
+          >
+            {movieCrew.map((item) => (
+              <MediaCard key={item.id} item={item} onClick={() => onSelect(item)} />
+            ))}
+          </div>
+        </div>
+      )}
 
-          {tvCrew.length > 0 && (
-            <ScrollRow
-              title="TV Crew"
-              items={tvCrew}
-              onSelect={onSelect}
-            />
-          )}
+      {tvCrew.length > 0 && (
+        <div className="section">
+          <div className="section-title">Crew (TV)</div>
+          <div
+            className={`scroll-row ${scrollState.tvCrew}`}
+            ref={tvCrewRef}
+            onScroll={() => checkScroll(tvCrewRef, "tvCrew")}
+          >
+            {tvCrew.map((item) => (
+              <MediaCard key={item.id} item={item} onClick={() => onSelect(item)} />
+            ))}
+          </div>
         </div>
       )}
 
@@ -242,3 +290,5 @@ export default function PersonPage({
     </div>
   );
 }
+
+export default memo(PersonPage);

@@ -21,7 +21,26 @@ import {
   Sparkles,
   Library,
   History,
+  Users,
 } from "lucide-react";
+
+function ProviderIcon({ provider }) {
+  if (!provider.logo_path) return <MonitorPlay size={20} />;
+  return (
+    <img
+      src={imgUrl(provider.logo_path, "w45")}
+      alt={provider.name}
+      style={{
+        width: 22,
+        height: 22,
+        borderRadius: 6,
+        objectFit: "cover",
+        flexShrink: 0,
+        display: "block",
+      }}
+    />
+  );
+}
 
 export default function Sidebar({
   page,
@@ -35,12 +54,33 @@ export default function Sidebar({
   onBack,
   canGoForward,
   onForward,
+  pinnedProviders = [],
+  activeProviderId = null,
 }) {
   const [dragOver, setDragOver] = useState(null);
   const dragItem = useRef(null);
   const dragNode = useRef(null);
 
-  const [contextMenu, setContextMenu] = useState(null); // { item, x, y }
+  const [contextMenu, setContextMenu] = useState(null);
+
+  // Scroll-area fade state
+  const scrollRef = useRef(null);
+  const [showTopFade, setShowTopFade] = useState(false);
+  const [showBottomFade, setShowBottomFade] = useState(true);
+
+  const handleScrollFade = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setShowTopFade(el.scrollTop > 8);
+    setShowBottomFade(el.scrollTop < el.scrollHeight - el.clientHeight - 8);
+  };
+
+  useEffect(() => {
+    // Re-evaluate bottom-fade after layout (content may be shorter than container)
+    const el = scrollRef.current;
+    if (!el) return;
+    setShowBottomFade(el.scrollHeight > el.clientHeight + 8);
+  }, [savedList, pinnedProviders]);
 
   useEffect(() => {
     const close = () => setContextMenu(null);
@@ -101,6 +141,7 @@ export default function Sidebar({
 
   return (
     <div className="sidebar">
+      {/* ── Sticky top: back / forward / search ── */}
       <div className="sidebar-nav">
         <button
           className={`sidebar-nav-btn ${!canGoBack ? "disabled" : ""}`}
@@ -126,9 +167,16 @@ export default function Sidebar({
           <Search size={16} />
         </button>
       </div>
-      <div className="sidebar-group">
-        <SideBtn
-          active={page === "home"}
+
+      {/* ── Scrollable middle ── */}
+      <div className="sidebar-scroll-area">
+        {showTopFade    && <div className="sidebar-fade sidebar-fade-top" />}
+        {showBottomFade && <div className="sidebar-fade sidebar-fade-bottom" />}
+
+        <div className="sidebar-scroll" ref={scrollRef} onScroll={handleScrollFade}>
+        <div className="sidebar-group">
+          <SideBtn
+            active={page === "home"}
           onClick={() => onNavigate("home")}
           icon={<Home size={20} />}
           label="Home"
@@ -177,6 +225,13 @@ export default function Sidebar({
           showLabel
         />
         <SideBtn
+          active={page === "people"}
+          onClick={() => onNavigate("people")}
+          icon={<Users size={20} />}
+          label="People"
+          showLabel
+        />
+        <SideBtn
           active={page === "collections"}
           onClick={() => onNavigate("collections")}
           icon={<Library size={20} />}
@@ -199,6 +254,22 @@ export default function Sidebar({
           showLabel
         />
       </div>
+
+      {pinnedProviders.length > 0 && (
+        <div className="sidebar-group">
+          <div className="sidebar-group-title">Providers</div>
+          {pinnedProviders.map((provider) => (
+            <SideBtn
+              key={provider.id}
+              active={activeProviderId === provider.id}
+              onClick={() => onNavigate("provider", provider)}
+              icon={<ProviderIcon provider={provider} />}
+              label={provider.name}
+              showLabel
+            />
+          ))}
+        </div>
+      )}
 
       <div className="sidebar-group">
         <div className="sidebar-group-title">Saved</div>
@@ -249,9 +320,10 @@ export default function Sidebar({
               </div>
             );
           })}
-        </div>
-      </div>
-
+        </div>{/* end .sidebar-saved */}
+        </div>{/* end .sidebar-group (saved) */}
+        </div>{/* end .sidebar-scroll */}
+      </div>{/* end .sidebar-scroll-area */}
 
       {contextMenu && (
         <div

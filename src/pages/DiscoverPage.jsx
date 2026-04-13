@@ -282,7 +282,13 @@ const DiscoverPage = memo(function DiscoverPage({
         })}
 
         {loading && Array.from({ length: 10 }).map((_, i) => (
-          <div key={`skeleton-${i}`} className="skeleton" style={{ height: 285, borderRadius: 10 }} />
+          <div key={`skeleton-${i}`} style={{ borderRadius: 8, overflow: "hidden", border: "1px solid var(--border)", background: "var(--surface2)" }}>
+            <div className="skeleton" style={{ aspectRatio: "2/3", borderRadius: 0 }} />
+            <div style={{ padding: "8px 10px" }}>
+              <div className="skeleton" style={{ height: 13, width: "75%", borderRadius: 4, marginBottom: 5 }} />
+              <div className="skeleton" style={{ height: 11, width: "48%", borderRadius: 4 }} />
+            </div>
+          </div>
         ))}
       </div>
 
