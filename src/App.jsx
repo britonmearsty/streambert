@@ -7,6 +7,7 @@ import {
   lazy,
   Suspense,
 } from "react";
+import { Loader } from "lucide-react";
 import ErrorBoundary from "./components/ErrorBoundary";
 import KeyboardShortcutsModal from "./components/KeyboardShortcutsModal";
 import WindowTitlebar from "./components/WindowTitlebar";
@@ -918,13 +919,13 @@ export default function App() {
             fallback={
               <div
                 style={{
-                  color: "var(--text2)",
-                  padding: 48,
-                  textAlign: "center",
-                  fontSize: 15,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  minHeight: "100%",
                 }}
               >
-                Laden…
+                <Loader className="animate-spin" size={32} />
               </div>
             }
           >

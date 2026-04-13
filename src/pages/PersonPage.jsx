@@ -8,6 +8,7 @@ import {
 } from "react";
 import { tmdbFetch, imgUrl } from "../utils/api";
 import MediaCard from "../components/MediaCard";
+import HorizontalScroll from "../components/HorizontalScroll";
 import { StarIcon, ArrowUpIcon } from "../components/Icons";
 
 const BIO_LIMIT = 400;
@@ -223,60 +224,44 @@ function PersonPage({ personId, apiKey, onBack, onSelect }) {
       {movieCast.length > 0 && (
         <div className="section">
           <div className="section-title">Movie Credits</div>
-          <div
-            className={`scroll-row ${scrollState.movies}`}
-            ref={moviesRef}
-            onScroll={() => checkScroll(moviesRef, "movies")}
-          >
+          <HorizontalScroll variant="scroll-row" scrollAmount={160}>
             {movieCast.map((item) => (
               <MediaCard key={item.id} item={item} onClick={() => onSelect(item)} />
             ))}
-          </div>
+          </HorizontalScroll>
         </div>
       )}
 
       {tvCast.length > 0 && (
         <div className="section">
           <div className="section-title">TV Credits</div>
-          <div
-            className={`scroll-row ${scrollState.tv}`}
-            ref={tvRef}
-            onScroll={() => checkScroll(tvRef, "tv")}
-          >
+          <HorizontalScroll variant="scroll-row" scrollAmount={160}>
             {tvCast.map((item) => (
               <MediaCard key={item.id} item={item} onClick={() => onSelect(item)} />
             ))}
-          </div>
+          </HorizontalScroll>
         </div>
       )}
 
       {movieCrew.length > 0 && (
         <div className="section">
           <div className="section-title">Crew (Movies)</div>
-          <div
-            className={`scroll-row ${scrollState.movieCrew}`}
-            ref={movieCrewRef}
-            onScroll={() => checkScroll(movieCrewRef, "movieCrew")}
-          >
+          <HorizontalScroll variant="scroll-row" scrollAmount={160}>
             {movieCrew.map((item) => (
               <MediaCard key={item.id} item={item} onClick={() => onSelect(item)} />
             ))}
-          </div>
+          </HorizontalScroll>
         </div>
       )}
 
       {tvCrew.length > 0 && (
         <div className="section">
           <div className="section-title">Crew (TV)</div>
-          <div
-            className={`scroll-row ${scrollState.tvCrew}`}
-            ref={tvCrewRef}
-            onScroll={() => checkScroll(tvCrewRef, "tvCrew")}
-          >
+          <HorizontalScroll variant="scroll-row" scrollAmount={160}>
             {tvCrew.map((item) => (
               <MediaCard key={item.id} item={item} onClick={() => onSelect(item)} />
             ))}
-          </div>
+          </HorizontalScroll>
         </div>
       )}
 

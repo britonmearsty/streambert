@@ -1,5 +1,6 @@
 import { memo } from "react";
 import MediaCard from "./MediaCard";
+import HorizontalScroll from "./HorizontalScroll";
 import { isRestricted } from "../utils/ageRating";
 
 /**
@@ -60,7 +61,7 @@ export default memo(function HorizontalRow({
           )}
         </div>
       </div>
-      <div className="horizontal-scroll">
+      <HorizontalScroll showButtons={true} variant="horizontal-scroll">
         {items.map((item) => {
           const typeKey = item.media_type === "tv" ? "tv" : "movie";
           const pk = `${typeKey}_${item.id}`;
@@ -81,7 +82,7 @@ export default memo(function HorizontalRow({
             </div>
           );
         })}
-      </div>
+      </HorizontalScroll>
     </div>
   );
 }, areEqual);

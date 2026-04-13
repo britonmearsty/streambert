@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import MediaCard from "../components/MediaCard";
 import HorizontalRow from "../components/HorizontalRow";
+import HorizontalScroll from "../components/HorizontalScroll";
 import { PlayIcon, StarIcon } from "../components/Icons";
 import { imgUrl, tmdbFetch, fetchProviderContent } from "../utils/api";
 import { useRatings } from "../utils/useRatings";
@@ -216,7 +217,7 @@ export default function HomePage({
               <div className="section-title">
                 <div className="skeleton" style={{ width: 220, height: 22, borderRadius: 6 }} />
               </div>
-              <div className="horizontal-scroll">
+              <HorizontalScroll showButtons={false}>
                 {Array.from({ length: 7 }).map((_, ci) => (
                   <div key={ci} className="horizontal-scroll-item" style={{ borderRadius: 8, overflow: "hidden", border: "1px solid var(--border)", background: "var(--surface2)" }}>
                     <div className="skeleton" style={{ aspectRatio: "2/3", borderRadius: 0 }} />
@@ -226,7 +227,7 @@ export default function HomePage({
                     </div>
                   </div>
                 ))}
-              </div>
+              </HorizontalScroll>
             </div>
           ))}
         </>

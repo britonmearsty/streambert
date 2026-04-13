@@ -48,6 +48,7 @@ import {
 import DownloadModal from "../components/DownloadModal";
 import TrailerModal from "../components/TrailerModal";
 import MediaCard from "../components/MediaCard";
+import HorizontalScroll from "../components/HorizontalScroll";
 import BlockedStatsModal from "../components/BlockedStatsModal";
 import { useBlockedStats } from "../utils/useBlockedStats";
 import { storage, STORAGE_KEYS } from "../utils/storage";
@@ -2243,7 +2244,7 @@ function TVPage({
       {cast.length > 0 && (
         <div className="section">
           <div className="section-title">Cast</div>
-          <div className="scroll-row">
+          <HorizontalScroll variant="scroll-row" scrollAmount={180}>
             {cast.map((person) => (
               <div
                 key={person.id}
@@ -2266,14 +2267,14 @@ function TVPage({
                 <div className="cast-card__role">{person.character}</div>
               </div>
             ))}
-          </div>
+          </HorizontalScroll>
         </div>
       )}
 
       {similar.length > 0 && onSelect && (
         <div className="section">
           <div className="section-title">Similar Shows</div>
-          <div className="scroll-row">
+          <HorizontalScroll variant="scroll-row" scrollAmount={160}>
             {similar.map((show) => {
               const pk = `tv_${show.id}`;
               return (
@@ -2288,7 +2289,7 @@ function TVPage({
                 />
               );
             })}
-          </div>
+          </HorizontalScroll>
         </div>
       )}
 

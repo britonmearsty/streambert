@@ -167,4 +167,12 @@ contextBridge.exposeInMainWorld("electron", {
   },
   offScheduledBackupRequested: (h) =>
     ipcRenderer.removeListener("scheduled-backup-requested", h),
+
+  // Sports (WeStream API)
+  sportsGetSports: () => ipcRenderer.invoke("sports-get-sports"),
+  sportsGetMatches: (sport) => ipcRenderer.invoke("sports-get-matches", sport),
+  sportsGetLiveMatches: () => ipcRenderer.invoke("sports-get-live-matches"),
+  sportsGetPopularMatches: () => ipcRenderer.invoke("sports-get-popular-matches"),
+  sportsGetTodayMatches: () => ipcRenderer.invoke("sports-get-today-matches"),
+  sportsGetStreams: (args) => ipcRenderer.invoke("sports-get-streams", args),
 });

@@ -1,13 +1,12 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { IconWeStream, ChevronLeftIcon, ChevronRightIcon, StarIcon, SourceIcon, LoaderIcon } from "../components/Icons";
-import "../styles/global.css"; // Reuse global styles
+import { IconWeStream, ChevronDownIcon, StarIcon, SourceIcon, LoaderIcon } from "../components/Icons";
+import "../styles/global.css";
 
 const STREAMED_BASE = "https://streamed.pk";
 
-// ── In-memory sports cache (session-scoped) ────────────────────────────────────
-const _sportsCache = new Map(); // key → { data, expiresAt, ts }
-const SPORTS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes for categories
-const MATCHES_CACHE_TTL = 3 * 60 * 1000; // 3 minutes for matches
+const _sportsCache = new Map();
+const SPORTS_CACHE_TTL = 5 * 60 * 1000;
+const MATCHES_CACHE_TTL = 3 * 60 * 1000;
 const _maxCacheEntries = 20;
 
 function _getCached(key) {
@@ -29,7 +28,6 @@ function _setCached(key, data, ttl = SPORTS_CACHE_TTL) {
 function _isStale(key, ttl = SPORTS_CACHE_TTL) {
   const cached = _sportsCache.get(key);
   if (!cached) return true;
-  // Consider cache stale if older than 1.5x the given TTL
   const staleThreshold = cached.ts + (ttl * 1.5);
   return Date.now() > staleThreshold;
 }
@@ -44,11 +42,43 @@ export default function SportsPage({ onBack }) {
   const [loading, setLoading] = useState(true);
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [error, setError] = useState(null);
-  const [playing, setPlaying] = useState(null); // { embedUrl, title, streamNo }
+  const [playing, setPlaying] = useState(null);
   const [streams, setStreams] = useState([]);
   const [loadingStreams, setLoadingStreams] = useState(false);
+  const [sportDropdownOpen, setSportDropdownOpen] = useState(false);
+  const sportDropdownRef = useRef(null);
+  const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
+  const typeDropdownRef = useRef(null);
 
-  // Fetch sports categories (with stale-while-revalidate)
+  const SPORT_TYPES = [
+    { id: "all", name: "All Types" },
+    { id: "live", name: "Live" },
+    { id: "upcoming", name: "Upcoming" },
+    { id: "popular", name: "Popular" },
+    { id: "today", name: "Today" },
+  ];
+  const [activeType, setActiveType] = useState("all");
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (sportDropdownRef.current && !sportDropdownRef.current.contains(e.target)) {
+        setSportDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (typeDropdownRef.current && !typeDropdownRef.current.contains(e.target)) {
+        setTypeDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   useEffect(() => {
     if (!window.electron?.sportsGetSports) return;
     
@@ -57,14 +87,12 @@ export default function SportsPage({ onBack }) {
     const isStale = cached ? _isStale(cacheKey, SPORTS_CACHE_TTL) : true;
     const hasExisting = cached && cached.sports?.length > 0;
     
-    // Show cached data immediately if available and not stale
     if (cached && !isStale) {
       setSports(cached.sports);
       setLiveMatches(cached.liveMatches);
       setPopularMatches(cached.popularMatches);
       setTodayMatches(cached.todayMatches);
       setLoadingInitial(false);
-      // Still fetch in background to keep cache fresh
       window.electron.sportsGetSports().then(d => {
         if (!d?.error) _setCached(cacheKey, { 
           sports: [{ id: "all", name: "All Sports" }, ...(d || [])],
@@ -76,7 +104,6 @@ export default function SportsPage({ onBack }) {
       return;
     }
 
-    // Show existing data while fetching (stale or no cache)
     if (hasExisting) {
       setSports(cached.sports);
       setLiveMatches(cached.liveMatches);
@@ -86,7 +113,6 @@ export default function SportsPage({ onBack }) {
       setLoadingInitial(true);
     }
 
-    // Fetch fresh data
     Promise.all([
       window.electron.sportsGetSports(),
       window.electron.sportsGetLiveMatches(),
@@ -111,7 +137,6 @@ export default function SportsPage({ onBack }) {
       .finally(() => setLoadingInitial(false));
   }, []);
 
-  // Fetch matches based on active sport (with stale-while-revalidate)
   useEffect(() => {
     if (!window.electron?.sportsGetMatches) return;
     setError(null);
@@ -120,14 +145,12 @@ export default function SportsPage({ onBack }) {
     const cached = _getCached(cacheKey);
     const isStale = cached ? _isStale(cacheKey, MATCHES_CACHE_TTL) : true;
     
-    // Show cached data immediately if fresh
     if (cached && !isStale) {
       setMatches(cached);
       setLoading(false);
       return;
     }
 
-    // Show existing data while fetching (stale or no cache)
     if (cached) {
       setMatches(cached);
     } else {
@@ -149,7 +172,6 @@ export default function SportsPage({ onBack }) {
       });
   }, [activeSport]);
 
-  // Player fullscreen
   useEffect(() => {
     if (playing) {
       document.documentElement.setAttribute("data-player-fullscreen", "1");
@@ -196,12 +218,7 @@ export default function SportsPage({ onBack }) {
     }
   };
 
-  const categoriesRef = useRef(null);
-  const scrollCategories = (dir) => {
-    if (categoriesRef.current) {
-      categoriesRef.current.scrollBy({ left: dir * 200, behavior: "smooth" });
-    }
-  };
+  const selectedSport = sports.find((s) => s.id === activeSport);
 
   if (playing) {
     return (
@@ -225,56 +242,87 @@ export default function SportsPage({ onBack }) {
           <IconWeStream />
           <h1 className="sports-title">Sports Center</h1>
         </div>
-      </div>
-
-      {/* Categories Scroller */}
-      <div className="sports-categories-wrap">
-        <button className="categories-nav-btn" onClick={() => scrollCategories(-1)} disabled={loadingInitial}>
-          <ChevronLeftIcon size={18} />
-        </button>
-        <div className="sports-categories" ref={categoriesRef}>
-          {loadingInitial ? (
-            <>
-              <div className="sport-cat-skeleton skeleton" />
-              <div className="sport-cat-skeleton skeleton" />
-              <div className="sport-cat-skeleton skeleton" />
-              <div className="sport-cat-skeleton skeleton" />
-              <div className="sport-cat-skeleton skeleton" />
-            </>
-          ) : (
-            sports.map((sport) => (
-              <button
-                key={sport.id}
-                className={`sport-cat-btn ${activeSport === sport.id ? "active" : ""}`}
-                onClick={() => setActiveSport(sport.id)}
-              >
-                {sport.name}
-              </button>
-            ))
-          )}
+        <div className="sports-filters">
+          <div className="sport-filter-wrap" ref={sportDropdownRef}>
+            {loadingInitial ? (
+              <div className="sport-filter-loading">
+                <div className="sport-dropdown-skeleton skeleton" />
+              </div>
+            ) : (
+              <>
+                <div
+                  className={`dropdown-trigger ${sportDropdownOpen ? "dropdown-trigger--active" : ""}`}
+                  onClick={() => setSportDropdownOpen(!sportDropdownOpen)}
+                >
+                  <span>{selectedSport?.name || "All Sports"}</span>
+                  <ChevronDownIcon size={16} />
+                </div>
+                {sportDropdownOpen && (
+                  <div className="dropdown-menu">
+                    {sports.map((sport) => (
+                      <div
+                        key={sport.id}
+                        className={`dropdown-item ${sport.id === activeSport ? "dropdown-item--selected" : ""}`}
+                        onClick={() => {
+                          setActiveSport(sport.id);
+                          setSportDropdownOpen(false);
+                        }}
+                      >
+                        {sport.name}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+          <div className="sport-filter-wrap" ref={typeDropdownRef}>
+            {loadingInitial ? (
+              <div className="sport-filter-loading">
+                <div className="sport-dropdown-skeleton skeleton" />
+              </div>
+            ) : (
+              <>
+                <div
+                  className={`dropdown-trigger ${typeDropdownOpen ? "dropdown-trigger--active" : ""}`}
+                  onClick={() => setTypeDropdownOpen(!typeDropdownOpen)}
+                >
+                  <span>{SPORT_TYPES.find(t => t.id === activeType)?.name || "All Types"}</span>
+                  <ChevronDownIcon size={16} />
+                </div>
+                {typeDropdownOpen && (
+                  <div className="dropdown-menu">
+                    {SPORT_TYPES.map((type) => (
+                      <div
+                        key={type.id}
+                        className={`dropdown-item ${type.id === activeType ? "dropdown-item--selected" : ""}`}
+                        onClick={() => {
+                          setActiveType(type.id);
+                          setTypeDropdownOpen(false);
+                        }}
+                      >
+                        {type.name}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
-        <button className="categories-nav-btn" onClick={() => scrollCategories(1)} disabled={loadingInitial}>
-          <ChevronRightIcon size={18} />
-        </button>
       </div>
-      <style dangerouslySetInnerHTML={{ __html: `
-        .sport-cat-skeleton {
-          width: 80px;
-          height: 36px;
-          border-radius: 20px;
-        }
-        .categories-nav-btn:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-        }
-      ` }} />
 
-      {/* Live Section */}
-      {(loadingInitial ? 3 : liveMatches.length > 0) && activeSport === "all" && (
+      {(loadingInitial ? 3 : liveMatches.length > 0) && activeSport === "all" && (activeType === "all" || activeType === "live") && (
         <div className="sports-section">
           <div className="section-header">
             <div className="section-title">
-              <span className="live-dot" /> Live Now
+              {loadingInitial ? (
+                <div className="skeleton" style={{ width: 120, height: 20, borderRadius: 4 }} />
+              ) : (
+                <>
+                  <span className="live-dot" /> Live Now
+                </>
+              )}
             </div>
           </div>
           <div className="sports-grid">
@@ -293,12 +341,17 @@ export default function SportsPage({ onBack }) {
         </div>
       )}
 
-      {/* Popular Section */}
-      {(loadingInitial ? 3 : popularMatches.length > 0) && activeSport === "all" && (
+      {(loadingInitial ? 3 : popularMatches.length > 0) && activeSport === "all" && (activeType === "all" || activeType === "popular") && (
         <div className="sports-section">
           <div className="section-header">
             <div className="section-title">
-              <StarIcon /> Popular Events
+              {loadingInitial ? (
+                <div className="skeleton" style={{ width: 160, height: 20, borderRadius: 4 }} />
+              ) : (
+                <>
+                  <StarIcon /> Popular Events
+                </>
+              )}
             </div>
           </div>
           <div className="sports-grid">
@@ -317,12 +370,15 @@ export default function SportsPage({ onBack }) {
         </div>
       )}
 
-      {/* Today Section */}
-      {(loadingInitial ? 3 : todayMatches.length > 0) && activeSport === "all" && (
+      {(loadingInitial ? 3 : todayMatches.length > 0) && activeSport === "all" && (activeType === "all" || activeType === "today") && (
         <div className="sports-section">
           <div className="section-header">
             <div className="section-title">
-              Today's Schedule
+              {loadingInitial ? (
+                <div className="skeleton" style={{ width: 150, height: 20, borderRadius: 4 }} />
+              ) : (
+                "Today's Schedule"
+              )}
             </div>
           </div>
           <div className="sports-grid">
@@ -341,11 +397,14 @@ export default function SportsPage({ onBack }) {
         </div>
       )}
 
-      {/* Main Matches Section */}
       <div className="sports-section">
         <div className="section-header">
           <div className="section-title">
-            {activeSport === "all" ? "Upcoming Matches" : `${sports.find(s => s.id === activeSport)?.name || ""} Matches`}
+            {loading || loadingInitial ? (
+              <div className="skeleton" style={{ width: 180, height: 20, borderRadius: 4 }} />
+            ) : (
+              activeSport === "all" ? "Upcoming Matches" : `${sports.find(s => s.id === activeSport)?.name || ""} Matches`
+            )}
           </div>
         </div>
         {loading || loadingInitial ? (
@@ -396,55 +455,27 @@ export default function SportsPage({ onBack }) {
           margin: 0;
           color: var(--text);
         }
-        .sports-categories-wrap {
+        .sports-filters {
+          margin-left: auto;
           display: flex;
-          align-items: center;
-          gap: 8px;
-          margin-bottom: 32px;
+          gap: 12px;
+        }
+        .sport-filter-wrap {
           position: relative;
         }
-        .sports-categories {
+        .sport-filter-loading {
           display: flex;
-          gap: 10px;
-          overflow-x: auto;
-          scrollbar-width: none;
-          padding: 4px 0;
-          scroll-behavior: smooth;
         }
-        .sports-categories::-webkit-scrollbar { display: none; }
-        .sport-cat-btn {
-          padding: 8px 18px;
-          background: var(--bg2);
-          border: 1px solid var(--border);
-          border-radius: 20px;
-          color: var(--text2);
-          font-size: 14px;
-          font-weight: 500;
-          white-space: nowrap;
-          cursor: pointer;
-          transition: all 0.2s;
+        .sport-filter-wrap .dropdown-menu {
+          min-width: 180px;
         }
-        .sport-cat-btn:hover {
-          background: var(--bg3);
-          border-color: var(--text3);
+        .sport-dropdown-skeleton {
+          width: 160px;
+          height: 40px;
+          border-radius: 8px;
         }
-        .sport-cat-btn.active {
-          background: var(--red);
-          color: white;
-          border-color: var(--red);
-        }
-        .categories-nav-btn {
-          width: 32px;
-          height: 32px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: var(--bg2);
-          border: 1px solid var(--border);
-          border-radius: 50%;
-          color: var(--text);
-          cursor: pointer;
-          z-index: 2;
+        .sports-section {
+          margin-bottom: 40px;
         }
         .sports-grid {
           display: grid;
@@ -573,6 +604,37 @@ export default function SportsPage({ onBack }) {
           50% { opacity: 0.4; }
           100% { opacity: 1; }
         }
+        .match-card-skeleton {
+          pointer-events: none;
+          border-radius: 12px;
+          overflow: hidden;
+          border: 1px solid var(--border);
+          background: var(--surface2);
+          padding: 16px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+        .match-card-skeleton-poster {
+          width: 100%;
+          height: 120px;
+          border-radius: 8px;
+        }
+        .match-card-skeleton-cat {
+          width: 60px;
+          height: 12px;
+          border-radius: 4px;
+        }
+        .match-card-skeleton-title {
+          width: 80%;
+          height: 16px;
+          border-radius: 4px;
+        }
+        .match-card-skeleton-date {
+          width: 60%;
+          height: 16px;
+          border-radius: 4px;
+        }
         .sports-player-wrap {
           position: fixed;
           top: 0; left: 0; right: 0; bottom: 0;
@@ -654,11 +716,11 @@ export default function SportsPage({ onBack }) {
 
 function SkeletonCard() {
   return (
-    <div className="match-card" style={{ pointerEvents: "none" }}>
-      <div className="skeleton" style={{ width: "100%", height: 120, borderRadius: 8, marginBottom: 12 }} />
-      <div className="skeleton" style={{ width: 60, height: 12, borderRadius: 4, marginBottom: 8 }} />
-      <div className="skeleton" style={{ width: "80%", height: 16, borderRadius: 4, marginBottom: 4 }} />
-      <div className="skeleton" style={{ width: "60%", height: 16, borderRadius: 4 }} />
+    <div className="match-card-skeleton">
+      <div className="skeleton match-card-skeleton-poster" />
+      <div className="skeleton match-card-skeleton-cat" />
+      <div className="skeleton match-card-skeleton-title" />
+      <div className="skeleton match-card-skeleton-date" />
     </div>
   );
 }
@@ -682,7 +744,6 @@ function MatchCard({ match, onPlay, isLive }) {
       if (posterPath.startsWith("http")) return posterPath;
       return `${STREAMED_BASE}${posterPath}`;
     }
-    // Fallback to match poster API if team badges exist
     if (teams?.home?.badge && teams?.away?.badge) {
       return `${STREAMED_BASE}/api/images/poster/${teams.home.badge}/${teams.away.badge}.webp`;
     }
@@ -784,8 +845,6 @@ function SportsPlayer({ match, streams, onClose, onSwitchStream }) {
     const wv = webviewRef.current;
     if (!wv) return;
     const done = () => setWebviewLoading(false);
-    
-    // Safety timeout: hide spinner after 12s even if events don't fire
     const safetyTimer = setTimeout(done, 12000);
 
     wv.addEventListener("did-finish-load", done);

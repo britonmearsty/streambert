@@ -1293,11 +1293,149 @@ body::-webkit-scrollbar,
     scroll-behavior: smooth;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
+    position: relative;
 }
 
 .horizontal-scroll::-webkit-scrollbar {
     display: none;
     height: 0;
+}
+
+.scroll-row-wrap {
+    position: relative;
+}
+
+.scroll-row-wrap:hover .scroll-nav {
+    opacity: 1;
+}
+
+.scroll-nav {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 48px;
+    z-index: 5;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+    pointer-events: none;
+}
+
+.scroll-nav--left {
+    left: 0;
+    background: linear-gradient(to right, var(--bg) 0%, rgba(0, 0, 0, 0.25) 35%, transparent 100%);
+    justify-content: flex-start;
+    padding-left: 4px;
+}
+
+.scroll-nav--right {
+    right: 0;
+    background: linear-gradient(to left, var(--bg) 0%, rgba(0, 0, 0, 0.25) 35%, transparent 100%);
+    justify-content: flex-end;
+    padding-right: 4px;
+}
+
+.scroll-nav svg {
+    width: 22px;
+    height: 22px;
+    color: var(--text);
+    background: rgba(30, 30, 30, 0.65);
+    border-radius: 50%;
+    padding: 4px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    transition: all 0.15s ease;
+}
+
+.scroll-nav:hover svg {
+    background: var(--surface3);
+    color: var(--red);
+}
+
+.scroll-nav.visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.scroll-nav:disabled {
+    cursor: default;
+    opacity: 0 !important;
+    pointer-events: none;
+}
+
+.horizontal-scroll::-webkit-scrollbar {
+    display: none;
+    height: 0;
+}
+
+.scroll-row-wrap {
+    position: relative;
+}
+
+.scroll-row-wrap:hover .scroll-nav {
+    opacity: 1;
+}
+
+.scroll-nav {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 60px;
+    z-index: 5;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+    pointer-events: none;
+}
+
+.scroll-nav--left {
+    left: 0;
+    background: linear-gradient(to right, var(--bg) 0%, transparent 100%);
+    justify-content: flex-start;
+    padding-left: 8px;
+}
+
+.scroll-nav--right {
+    right: 0;
+    background: linear-gradient(to left, var(--bg) 0%, transparent 100%);
+    justify-content: flex-end;
+    padding-right: 8px;
+}
+
+.scroll-nav svg {
+    width: 28px;
+    height: 28px;
+    color: var(--text);
+    background: rgba(30, 30, 30, 0.85);
+    border-radius: 50%;
+    padding: 6px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    transition: all 0.15s ease;
+}
+
+.scroll-nav:hover svg {
+    background: var(--surface3);
+    color: var(--red);
+}
+
+.scroll-nav.visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.scroll-nav:disabled {
+    cursor: default;
+    opacity: 0 !important;
+    pointer-events: none;
 }
 
 .horizontal-scroll-item {
@@ -1498,7 +1636,7 @@ body.no-anim *::after {
     position: absolute;
     top: 0;
     bottom: 0;
-    width: 60px;
+    width: 48px;
     z-index: 5;
     pointer-events: none;
     transition: opacity 0.3s;
@@ -1506,12 +1644,12 @@ body.no-anim *::after {
 
 .scroll-row::before {
     left: 0;
-    background: linear-gradient(to right, var(--bg) 0%, transparent 100%);
+    background: linear-gradient(to right, var(--bg) 0%, rgba(0, 0, 0, 0.25) 35%, transparent 100%);
 }
 
 .scroll-row::after {
     right: 0;
-    background: linear-gradient(to left, var(--bg) 0%, transparent 100%);
+    background: linear-gradient(to left, var(--bg) 0%, rgba(0, 0, 0, 0.25) 35%, transparent 100%);
 }
 
 .scroll-row.at-start::before {
@@ -1530,7 +1668,7 @@ body.no-anim *::after {
     position: absolute;
     top: 0;
     bottom: 0;
-    width: 60px;
+    width: 48px;
     z-index: 5;
     background: transparent;
     border: none;
@@ -1545,26 +1683,26 @@ body.no-anim *::after {
 
 .scroll-nav--left {
     left: 0;
-    background: linear-gradient(to right, var(--bg) 0%, transparent 100%);
+    background: linear-gradient(to right, var(--bg) 0%, rgba(0, 0, 0, 0.25) 35%, transparent 100%);
     justify-content: flex-start;
-    padding-left: 8px;
+    padding-left: 4px;
 }
 
 .scroll-nav--right {
     right: 0;
-    background: linear-gradient(to left, var(--bg) 0%, transparent 100%);
+    background: linear-gradient(to left, var(--bg) 0%, rgba(0, 0, 0, 0.25) 35%, transparent 100%);
     justify-content: flex-end;
-    padding-right: 8px;
+    padding-right: 4px;
 }
 
 .scroll-nav svg {
-    width: 28px;
-    height: 28px;
+    width: 22px;
+    height: 22px;
     color: var(--text);
-    background: rgba(30, 30, 30, 0.85);
+    background: rgba(30, 30, 30, 0.65);
     border-radius: 50%;
-    padding: 6px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    padding: 4px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
     transition: all 0.15s ease;
 }
 

@@ -42,6 +42,7 @@ import TrailerModal from "../components/TrailerModal";
 import BlockedStatsModal from "../components/BlockedStatsModal";
 import { useBlockedStats } from "../utils/useBlockedStats";
 import MediaCard from "../components/MediaCard";
+import HorizontalScroll from "../components/HorizontalScroll";
 import { storage } from "../utils/storage";
 import {
   fetchMovieRating,
@@ -1097,7 +1098,7 @@ function MoviePage({
       {cast.length > 0 && (
         <div className="section">
           <div className="section-title">Cast</div>
-          <div className={`scroll-row ${scrollState.cast}`} ref={castRef} onScroll={() => checkScroll(castRef, "cast")}>
+          <HorizontalScroll variant="scroll-row" scrollAmount={180}>
             {cast.map((person) => (
               <div
                 key={person.id}
@@ -1120,14 +1121,14 @@ function MoviePage({
                 <div className="cast-card__role">{person.character}</div>
               </div>
             ))}
-          </div>
+          </HorizontalScroll>
         </div>
       )}
 
       {similar.length > 0 && onSelect && (
         <div className="section">
           <div className="section-title">Similar</div>
-          <div className={`scroll-row ${scrollState.similar}`} ref={similarRef} onScroll={() => checkScroll(similarRef, "similar")}>
+          <HorizontalScroll variant="scroll-row" scrollAmount={160}>
             {similar.map((movie) => {
               const pk = `movie_${movie.id}`;
               return (
@@ -1142,7 +1143,7 @@ function MoviePage({
                 />
               );
             })}
-          </div>
+          </HorizontalScroll>
         </div>
       )}
 
